@@ -77,6 +77,7 @@
 #include "security.h"
 #include "mst.h"
 #include "dir.h"
+#include "logfile.h"
 #include "ntfstime.h"
 /* #include "version.h" */
 #include "support.h"
@@ -462,11 +463,74 @@ static const char *reparse_type_name(le32 tag)
 }
 
 /* *************** functions for dumping global info ******************** */
+
+/*
+ *		Show $LogFile details
+ */
+
+static void ntfs_dump_logfile(ntfs_inode *ni)
+{
+	ntfs_attr *na;
+	RESTART_PAGE_HEADER *rp = NULL;
+	RESTART_AREA *ra;
+	const char *state;
+
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		fprintf(stderr, "Failed to open $FILE_LogFile/$DATA");
+		goto out;
+	}
+	
+	if (ntfs_check_logfile(na, &rp)) {
+		printf("File_Logfile Information\n");
+		if (rp) {
+			ra = (RESTART_AREA*)((char*)rp
+				+ le16_to_cpu(rp->restart_area_offset));
+			if (ntfs_is_rstr_record(rp->magic))
+				state = "valid";
+			else if (ntfs_is_chkd_record(rp->magic))
+				state = "checked";
+			else if (ntfs_is_empty_record(rp->magic))
+				state = "erased";
+			else
+				state = "unknown";
+			printf("\tLog state: %s\n", state);
+			printf("\tSystem page size: %d\n",
+				(int)le32_to_cpu(rp->system_page_size));
+			printf("\tLog page size: %d\n",
+				(int)le32_to_cpu(rp->log_page_size));
+			printf("\tLog version: %d.%d\n",
+				(int)le16_to_cpu(rp->major_ver),
+				(int)le16_to_cpu(rp->minor_ver));
+			printf("\tLog clients: %d\n",
+				(int)le16_to_cpu(ra->log_clients));
+			printf("\tFree client: %d\n",
+				(int)le16_to_cpu(ra->client_free_list));
+			printf("\tCurrent client: %d\n",
+				(int)le16_to_cpu(ra->client_in_use_list));
+			printf("\tRestart flags: 0x%x\n",
+				(int)le16_to_cpu(ra->flags));
+			if (ntfs_is_logfile_clean(na, rp))
+				state = "CLEAN";
+			else
+				state = "DIRTY";
+			printf("\tRestart state: %s\n", state);
+			free(rp);
+		} else {
+			printf("\tNo restart page\n");
+		}
+	}
+	ntfs_attr_close(na);
+out : ;
+}
+
 /**
  * ntfs_dump_volume - dump information about the volume
  */
 static void ntfs_dump_volume(ntfs_volume *vol)
 {
+	ntfs_inode *log;
+
 	printf("Volume Information \n");
 	printf("\tName of device: %s\n", vol->dev->d_name);
 	printf("\tDevice state: %lu\n", vol->dev->d_state);
@@ -552,7 +616,13 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 				(long long)vol->free_clusters,
 				100.0*vol->free_clusters
 					/(double)vol->nr_clusters);
-
+	log = ntfs_inode_open(vol, FILE_LogFile);
+	if (!log) {
+		fprintf(stderr, "Failed to open inode FILE_LogFile");
+	} else {
+		ntfs_dump_logfile(log);
+		ntfs_inode_close(log);
+	}
 	//TODO: Still need to add a few more attributes
 }
 
@@ -1472,8 +1542,11 @@ static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
  */
 static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_inode *ni)
 {
-	if (opts.verbose)
+	if (opts.verbose) {
 		ntfs_dump_sds(attr, ni);
+		if (ni->mft_no == FILE_LogFile)
+			ntfs_dump_logfile(ni);
+	}
 }
 
 typedef enum {
