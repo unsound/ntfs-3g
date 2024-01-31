@@ -1315,12 +1315,58 @@ static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
 	ntfs_dump_security_descriptor(sd, "\t");
 }
 
+static void ntfs_dump_sds_records(ntfs_attr *na, ntfs_index_context *xsii)
+{
+	SII_INDEX_DATA sii_data;
+	SECURITY_DESCRIPTOR_HEADER *sd;
+	INDEX_ENTRY *entry;
+	s64 offs;
+	u32 size;
+	u32 max_size;
+
+	max_size = 0;
+	sd = (SECURITY_DESCRIPTOR_HEADER*)NULL;
+	entry = xsii->entry;
+
+	if (entry) {
+		do {
+			/* Copy to get the offset properly aligned */
+			memcpy(&sii_data, ((char*)&entry->key.sii)
+				 + sizeof(entry->key.sii), sizeof(sii_data));
+			offs = le64_to_cpu(sii_data.offset);
+			size = le32_to_cpu(sii_data.length);
+			if (size > max_size) {
+				sd = (SECURITY_DESCRIPTOR_HEADER*)
+						realloc(sd, size);
+				max_size = size;
+			}
+			if (sd) {
+				if (ntfs_attr_pread(na, offs, size, sd)
+							== size) {
+					ntfs_dump_sds_entry(sd);
+				} else {
+					ntfs_log_perror(
+						"Failed to read a $SDS entry");
+				}
+			} else
+				ntfs_log_error(
+					"Failed to allocate a $SDS entry\n");
+			entry = ntfs_index_next(entry, xsii);
+		} while (entry && sd);
+	} else {
+		ntfs_log_perror("Could not get any $SII entry");
+	}
+	free(sd);
+}
+
+
 static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 {
-	SECURITY_DESCRIPTOR_HEADER *sds, *sd;
+	ntfs_index_context *xsii;
 	ntfschar *name;
 	int name_len;
-	s64 data_size;
+	le32 keyid;
+	ntfs_attr *na;
 	u64 inode;
 
 	inode = ni->mft_no;
@@ -1338,25 +1384,29 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 				  name, name_len, CASE_SENSITIVE, NULL, 0))
 		return;
 
-	sd = sds = ntfs_attr_readall(ni, AT_DATA, name, name_len, &data_size);
-	if (!sd) {
-		ntfs_log_perror("Failed to read $SDS attribute");
+		/* Open the $SDS data attribute */
+	na = ntfs_attr_open(ni, AT_DATA, name, name_len);
+	if (!na) {
+		ntfs_log_perror("Failed to open the $SDS data attribute");
 		return;
 	}
-	/*
-	 * FIXME: The right way is based on the indexes, so we couldn't
-	 * miss real entries. For now, dump until it makes sense.
-	 */
-	while (sd->length && sd->hash &&
-	       le64_to_cpu(sd->offset) < (u64)data_size &&
-	       le32_to_cpu(sd->length) < (u64)data_size &&
-	       le64_to_cpu(sd->offset) +
-			le32_to_cpu(sd->length) < (u64)data_size) {
-		ntfs_dump_sds_entry(sd);
-		sd = (SECURITY_DESCRIPTOR_HEADER *)((char*)sd +
-				((le32_to_cpu(sd->length) + 15) & ~15));
+
+		/* Use the $SII index to locate the records ordered by ids */
+	xsii = ntfs_index_ctx_get(ni, NTFS_INDEX_SII, 4);
+	if (!xsii) {
+		ntfs_log_perror("Failed to allocate the $SII index");
+	} else {
+			/* Search for the first entry */
+		keyid = const_cpu_to_le32(0);
+		if (!ntfs_index_lookup((char*)&keyid,
+					sizeof(SII_INDEX_KEY), xsii)) {
+			ntfs_log_perror("Failed to open the $SII index");
+		} else {
+			ntfs_dump_sds_records(na, xsii);
+		}
+		ntfs_index_ctx_put(xsii);
 	}
-	free(sds);
+	ntfs_attr_close(na);
 }
 
 static const char *get_attribute_type_name(le32 type)
@@ -1543,9 +1593,16 @@ static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
 static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_inode *ni)
 {
 	if (opts.verbose) {
-		ntfs_dump_sds(attr, ni);
-		if (ni->mft_no == FILE_LogFile)
+		switch (ni->mft_no) {
+		case FILE_Secure :
+			ntfs_dump_sds(attr, ni);
+			break;
+		case FILE_LogFile :
 			ntfs_dump_logfile(ni);
+			break;
+		default :
+			break;
+		}
 	}
 }
 
