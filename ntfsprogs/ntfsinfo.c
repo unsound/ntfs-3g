@@ -8,7 +8,7 @@
  * Copyright (c) 2004-2005 Yuval Fledel
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
- * Copyright (c) 2011-2020 Jean-Pierre Andre
+ * Copyright (c) 2011-2022 Jean-Pierre Andre
  *
  * This utility will dump a file's attributes.
  *
@@ -1594,7 +1594,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				reparse_type_name(tag));
 		ntfs_log_verbose("\t\tKey file id:\t\t %llu (0x%llx)\n",
 				(unsigned long long)
-				le64_to_cpu(entry->key.reparse.file_id),
+				MREF_LE(entry->key.reparse.file_id),
 				(unsigned long long)
 				le64_to_cpu(entry->key.reparse.file_id));
 		break;
@@ -1997,16 +1997,18 @@ static s32 ntfs_dump_index_block(INDEX_BLOCK *ib, INDEX_ATTR_TYPE type,
  */
 static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 {
-	INDEX_ALLOCATION *allocation, *tmp_alloc;
+	INDEX_ALLOCATION *allocation;
 	INDEX_ROOT *ir;
 	INDEX_ATTR_TYPE type;
+	ntfs_attr *na;
+	s64 offset;
+	u32 index_block_size;
 	int total_entries = 0;
 	int total_indx_blocks = 0;
 	u8 *bitmap, *byte;
 	int bit;
 	ntfschar *name;
 	u32 name_len;
-	s64 data_size;
 
 	ir = ntfs_index_root_get(ni, attr);
 	if (!ir) {
@@ -2025,21 +2027,32 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 		goto out_index_root;
 	}
 
-	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION,
-						   name, name_len, &data_size);
-	if (!tmp_alloc) {
-		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
+	index_block_size = le32_to_cpu(ir->index_block_size);
+	allocation = (INDEX_ALLOCATION*)ntfs_malloc(index_block_size);
+	if (!allocation) {
+		ntfs_log_perror("Failed to allocate $INDEX_ALLOCATION buffer");
 		goto out_bitmap;
 	}
+	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, name_len);
+	if (!na) {
+		ntfs_log_perror("Failed to open $INDEX_ALLOCATION");
+		goto out_alloc;
+	}
 
+	offset = 0;
 	bit = 0;
-	while ((u8 *)tmp_alloc < (u8 *)allocation + data_size) {
+	while (offset < na->data_size) {
 		if (*byte & (1 << bit)) {
 			int entries;
 
-			entries = ntfs_dump_index_block(tmp_alloc, type,
-							le32_to_cpu(
-							ir->index_block_size));
+			if (ntfs_attr_pread(na, offset, index_block_size,
+					allocation) != index_block_size) {
+				ntfs_log_perror("ntfs_attr_pread failed");
+				goto out_na;
+			}
+
+			entries = ntfs_dump_index_block(allocation, type,
+						index_block_size);
 	       		if (entries != -1) {
 				total_entries += entries;
 				total_indx_blocks++;
@@ -2047,19 +2060,19 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 						entries);
 			}
 		}
-		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc +
-						le32_to_cpu(
-						ir->index_block_size));
 		bit++;
 		if (bit > 7) {
 			bit = 0;
 			byte++;
 		}
+		offset += index_block_size;
 	}
-
 	printf("\tIndex entries total:\t %d\n", total_entries);
 	printf("\tINDX blocks total:\t %d\n", total_indx_blocks);
 
+out_na :
+	ntfs_attr_close(na);
+out_alloc :
 	free(allocation);
 out_bitmap:
 	free(bitmap);
