@@ -4202,6 +4202,7 @@ static fuse_fstype load_fuse_module(void)
 
 #endif
 
+#ifndef __GNU__
 static struct fuse_chan *try_fuse_mount(char *parsed_options)
 {
 	struct fuse_chan *fc = NULL;
@@ -4221,6 +4222,7 @@ free_args:
 	return fc;
 		
 }
+#endif /* defined(__GNU__) */
 		
 static int set_fuseblk_options(char **parsed_options)
 {
@@ -4241,23 +4243,37 @@ static int set_fuseblk_options(char **parsed_options)
 	return 0;
 }
 
-static struct fuse *mount_fuse(char *parsed_options)
+static struct fuse *mount_fuse(char *parsed_options, struct fuse_args *out_args)
 {
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-	
+
+#ifndef __GNU__
 	ctx->fc = try_fuse_mount(parsed_options);
 	if (!ctx->fc)
 		return NULL;
+#endif /* !defined(__GNU__) */
 	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+
+#ifndef __GNU__
+	if (fuse_opt_add_arg(&args, opts.mnt_point) == -1)
+		goto err;
+
+	if (fuse_opt_add_arg(&args, "-s") == -1)
+		goto err;
+#endif /* !defined(__GNU__) */
+
 	if (ctx->ro) {
 		char buf[128];
 		int len;
         
-		len = snprintf(buf, sizeof(buf), "-ouse_ino,kernel_cache"
-				",attr_timeout=%d,entry_timeout=%d",
+		len = snprintf(buf, sizeof(buf), "-ouse_ino"
+#ifndef __GNU__
+				",kernel_cache,attr_timeout=%d,"
+#endif /* !defined(__GNU__) */
+				"entry_timeout=%d",
 				(int)TIMEOUT_RO, (int)TIMEOUT_RO);
 		if ((len < 0)
 		    || (len >= (int)sizeof(buf))
@@ -4265,33 +4281,52 @@ static struct fuse *mount_fuse(char *parsed_options)
 			goto err;
 	} else {
 #if !CACHEING
-		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
-				",attr_timeout=0") == -1)
+		if (fuse_opt_add_arg(&args, "-ouse_ino"
+#ifndef __GNU__
+				",kernel_cache,attr_timeout=0"
+#endif /* !defined(__GNU__) */
+				) == -1)
 			goto err;
 #else
-		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
-				",attr_timeout=1") == -1)
+		if (fuse_opt_add_arg(&args, "-ouse_ino"
+#ifndef __GNU__
+				",kernel_cache,attr_timeout=1"
+#endif /* !defined(__GNU__) */
+				) == -1)
 			goto err;
-#endif
+#endif /* !CACHEING ... */
 	}
+#ifndef __GNU__
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
+#endif /* !defined(__GNU__) */
 	
+#ifndef __GNU__
 	fh = fuse_new(ctx->fc, &args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
 	if (!fh)
 		goto err;
 	
 	if (fuse_set_signal_handlers(fuse_get_session(fh)))
-		goto err_destory;
+		goto err_destroy;
+#endif /* !defined(__GNU__) */
 out:
-	fuse_opt_free_args(&args);
+	if(out_args) {
+		*out_args = args;
+	} else {
+		fuse_opt_free_args(&args);
+	}
+
 	return fh;
-err_destory:
+#ifndef __GNU__
+err_destroy:
 	fuse_destroy(fh);
+#endif /* !defined(__GNU__) */
 	fh = NULL;
 err:	
+#ifndef __GNU__
 	fuse_unmount(opts.mnt_point, ctx->fc);
+#endif /* !defined(__GNU__) */
 	goto out;
 }
 
@@ -4327,6 +4362,7 @@ int main(int argc, char *argv[])
 {
 	char *parsed_options = NULL;
 	struct fuse *fh;
+	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 #if !(defined(__sun) && defined (__SVR4))
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 #endif
@@ -4554,11 +4590,13 @@ int main(int argc, char *argv[])
 	register_internal_reparse_plugins();
 #endif /* DISABLE_PLUGINS */
 
-	fh = mount_fuse(parsed_options);
+	fh = mount_fuse(parsed_options, &args);
+#ifndef __GNU__
 	if (!fh) {
 		err = NTFS_VOLUME_FUSE_ERROR;
 		goto err_out;
 	}
+#endif /* !defined(__GNU__) */
 	
 	ctx->mounted = TRUE;
 
@@ -4575,13 +4613,17 @@ int main(int argc, char *argv[])
 	if ((ctx->vol->secure_flags & (1 << SECURITY_RAW))
 	    && !ctx->uid && ctx->gid)
 		ntfs_log_error("Warning : using problematic uid==0 and gid!=0\n");
-	
+
+#ifndef __GNU__
 	fuse_loop(fh);
-	
+
 	err = 0;
 
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
+#else
+	err = fuse_main(args.argc, args.argv, &ntfs_3g_ops, NULL);
+#endif /* !defined(__GNU__) ... */
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);
 	if (ctx->abs_mnt_point)
@@ -4598,5 +4640,6 @@ err2:
 	free(parsed_options);
 	free(opts.options);
 	free(opts.device);
+	fuse_opt_free_args(&args);
 	return err;
 }

@@ -186,6 +186,14 @@ extern const char *EXEC_NAME;
 #define FUSE_TYPE	"integrated FUSE"
 #else
 #define FUSE_TYPE	"external FUSE"
+#ifdef __GNU__
+static inline int fuse_version()
+{
+	/* libfuse-hurd currently provides a subset of the FUSE 2.6 API but
+	 * doesn't provide fuse_version() so for now let's provide it here. */
+	return 26;
+}
+#endif /* defined(__GNU__) */
 #endif
 
 extern const char xattr_ntfs_3g[];

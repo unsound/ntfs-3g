@@ -116,7 +116,9 @@ static int ntfs_fsync(int fildes)
  */
 static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 {
+#ifndef __GNU__
 	struct flock flk;
+#endif /* !defined(__GNU__) */
 	struct stat sbuf;
 	int err;
 
@@ -166,7 +168,8 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
-	
+
+#ifndef __GNU__
 	memset(&flk, 0, sizeof(flk));
 	if (NDevReadOnly(dev))
 		flk.l_type = F_RDLCK;
@@ -182,6 +185,7 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 			ntfs_log_perror("Failed to close '%s'", dev->d_name);
 		goto err_out;
 	}
+#endif /* !defined(__GNU__) */
 	
 	NDevSetOpen(dev);
 	return 0;
@@ -202,7 +206,9 @@ err_out:
  */
 static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 {
+#ifndef __GNU__
 	struct flock flk;
+#endif /* !defined(__GNU__) */
 
 	if (!NDevOpen(dev)) {
 		errno = EBADF;
@@ -215,12 +221,14 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 			return -1;
 		}
 
+#ifndef __GNU__
 	memset(&flk, 0, sizeof(flk));
 	flk.l_type = F_UNLCK;
 	flk.l_whence = SEEK_SET;
 	flk.l_start = flk.l_len = 0LL;
 	if (fcntl(DEV_FD(dev), F_SETLK, &flk))
 		ntfs_log_perror("Could not unlock %s", dev->d_name);
+#endif /* !defined(__GNU__) */
 	if (close(DEV_FD(dev))) {
 		ntfs_log_perror("Failed to close device %s", dev->d_name);
 		return -1;

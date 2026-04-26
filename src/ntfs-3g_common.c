@@ -135,6 +135,77 @@ const struct DEFOPTION optionlist[] = {
 	{ (const char*)NULL, 0, 0 } /* end marker */
 } ;
 
+#ifdef __GNU__
+
+/* The libfuse option processing functions are not currently in libfuse-hurd, so
+ * let's provide some fallbacks. */
+
+int fuse_opt_add_arg(struct fuse_args *args, const char *arg)
+{
+	/* Simple implementation of fuse_opt_add_arg which is missing from
+	 * libfuse-hurd. */
+	int ret = 0;
+	char *argdup = NULL;
+	char **new_argv = NULL;
+
+	argdup = strdup(arg);
+	if (!argdup) {
+		goto out;
+	}
+
+	if (args->allocated) {
+		new_argv = realloc(args->argv, (args->argc + 2) * sizeof(char*));
+	} else {
+		if (args->argc) {
+			ntfs_log_error("Non-allocated with non-0 args is not "
+				"allowed.\n");
+			errno = EINVAL;
+			ret = -1;
+			goto out;
+		}
+
+		new_argv = malloc((args->argc + 2) * sizeof(char*));
+	}
+
+	if (!new_argv) {
+		ret = -1;
+		goto out;
+	}
+
+	new_argv[args->argc] = argdup;
+	args->argv = new_argv;
+	++args->argc;
+	/* 'argv' is always allocated with an extra element to NULL-terminate the
+	 * array. */
+	args->argv[args->argc] = NULL;
+	args->allocated = 1;
+	argdup = NULL;
+	new_argv = NULL;
+out:
+	if (argdup) {
+		free(argdup);
+	}
+
+	return ret;
+}
+
+void fuse_opt_free_args(struct fuse_args *args)
+{
+	if (args->allocated) {
+		int i;
+
+		for (i = 0; i < args->argc; ++i) {
+			free(args->argv[i]);
+		}
+
+		free(args->argv);
+		args->argv = NULL;
+		args->argc = 0;
+		args->allocated = 0;
+	}
+}
+#endif /* defined(__GNU__) */
+
 #define STRAPPEND_MAX_INSIZE   8192
 #define strappend_is_large(x) ((x) > STRAPPEND_MAX_INSIZE)
 
@@ -219,7 +290,9 @@ int ntfs_strappend_escaped(char **dest, const char *append)
 #endif /* FUSE_VERSION >= 27 */
 
 	ret = ntfs_strappend(dest, escaped_string ? escaped_string : append);
+#if FUSE_VERSION >= 27
 out:
+#endif /* FUSE_VERSION >= 27 */
 	if (escaped_string) {
 		free(escaped_string);
 	}
@@ -731,6 +804,8 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 			return -1;
 		}
 	}
+
+	optind = 1;
 
 	if (!popts->device) {
 		ntfs_log_error("%s: No device is specified.\n", EXEC_NAME);

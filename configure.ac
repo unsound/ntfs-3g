@@ -144,6 +144,13 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[lowntfs-3g],
+	[AS_HELP_STRING([--disable-lowntfs-3g],[disable the lowntfs-3g lowlevel FUSE driver])],
+	,
+	[enable_lowntfs_3g="yes"]
+)
+
+AC_ARG_ENABLE(
 	[ntfsprogs],
 	[AS_HELP_STRING([--disable-ntfsprogs],[disable ntfsprogs utilities
 		       (default=no)])],
@@ -241,6 +248,12 @@ elif test "x${with_fuse}" = "x"; then
 		;;
 	darwin*|netbsd*|kfreebsd*-gnu)
 		with_fuse="external"
+		;;
+	gnu*)
+		# The GNU/Hurd FUSE library libfuse-hurd doesn't support the
+		# lowlevel API yet. Change this when it does.
+		with_fuse="external"
+		enable_lowntfs_3g="no"
 		;;
 	freebsd*)
 		AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
@@ -634,6 +647,7 @@ AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
 AM_CONDITIONAL([INSTALL_LIBRARY], [test "${enable_library}" = "yes"])
 AM_CONDITIONAL([ENABLE_MOUNT_HELPER], [test "${enable_mount_helper}" = "yes"])
 AM_CONDITIONAL([ENABLE_NTFS_3G], [test "${enable_ntfs_3g}" = "yes"])
+AM_CONDITIONAL([ENABLE_LOWNTFS_3G], [test "${enable_lowntfs_3g}" = "yes"])
 AM_CONDITIONAL([ENABLE_NTFSPROGS], [test "${enable_ntfsprogs}" = "yes"])
 AM_CONDITIONAL([ENABLE_EXTRAS], [test "${enable_extras}" = "yes"])
 AM_CONDITIONAL([ENABLE_QUARANTINED], [test "${enable_quarantined}" = "yes"])
