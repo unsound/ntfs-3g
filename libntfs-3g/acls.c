@@ -785,6 +785,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	int usidsz;
 	int gsidsz;
 	BOOL acceptable;
+	BOOL cancreator;
+	int withcrowner, withcrgroup;
 	const ACCESS_ALLOWED_ACE *poldace;
 	ACCESS_ALLOWED_ACE *pnewace;
 	ACCESS_ALLOWED_ACE *pauthace;
@@ -805,6 +807,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	selection = (fordir ? CONTAINER_INHERIT_ACE : OBJECT_INHERIT_ACE);
 	newcnt = 0;
 	oldcnt = le16_to_cpu(oldacl->ace_count);
+	withcrowner = withcrgroup = 0;
 	for (nace = 0; nace < oldcnt; nace++) {
 		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
@@ -926,6 +929,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			/*
 			 * Inheritance for access, specific to
 			 * creator-owner (and creator-group)
+			 * Only one ACCESS_ALLOWED_ACE_TYPE and
+			 * one ACCESS_DENIED_ACE_TYPE are allowed
+			 * and this must be checked to defend
+			 * against possible buffer overflows.
 			 */
 		if ((fordir || !inherited
 			|| (poldace->flags
@@ -939,7 +946,12 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				 * creator-group by owner and group
 				 * (but keep for further inheritance)
 				 */
-			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
+			cancreator = (pnewace->type == ACCESS_ALLOWED_ACE_TYPE)
+				|| (pnewace->type == ACCESS_DENIED_ACE_TYPE);
+			if (ntfs_same_sid(&pnewace->sid, ownersid)
+				&& cancreator
+				&& !(withcrowner & (1 << pnewace->type))) {
+				withcrowner |= 1 << pnewace->type;
 				memcpy(&pnewace->sid, usid, usidsz);
 				pnewace->size = cpu_to_le16(usidsz + 8);
 					/* remove inheritance flags */
@@ -957,7 +969,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 					newcnt++;
 				}
 			}
-			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
+			if (ntfs_same_sid(&pnewace->sid, groupsid)
+				&& cancreator
+				&& !(withcrgroup & (1 << pnewace->type))) {
+				withcrgroup |= 1 << pnewace->type;
 				memcpy(&pnewace->sid, gsid, gsidsz);
 				pnewace->size = cpu_to_le16(gsidsz + 8);
 					/* remove inheritance flags */
