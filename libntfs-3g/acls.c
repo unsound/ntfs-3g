@@ -659,6 +659,30 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 		&& ntfs_valid_sid((const SID*)&securattr[offowner])
 		&& ntfs_valid_sid((const SID*)&securattr[offgroup])
 			/*
+			 * Check that the owner and group SIDs, and the ACLs,
+			 * end within the allocated storage.
+			 *
+			 * ntfs_attr_size() cannot be relied on for this. It
+			 * only takes a field into account when the field lies
+			 * beyond the ones examined before it, so a field at a
+			 * lower offset is left out of the size it returns. The
+			 * owner SID is the usual case, as it is placed before
+			 * the group SID in most descriptors.
+			 *
+			 * The SID sizes are known sane here because
+			 * ntfs_valid_sid() has just bounded the sub authority
+			 * count, and the ACL sizes are readable because the
+			 * ACL headers were checked to be within storage.
+			 */
+		&& ((offowner + (unsigned int)ntfs_sid_size((const SID*)
+				&securattr[offowner])) <= attrsz)
+		&& ((offgroup + (unsigned int)ntfs_sid_size((const SID*)
+				&securattr[offgroup])) <= attrsz)
+		&& (!offdacl
+				|| ((offdacl + le16_to_cpu(pdacl->size)) <= attrsz))
+		&& (!offsacl
+				|| ((offsacl + le16_to_cpu(psacl->size)) <= attrsz))
+			/*
 			 * if there is an ACL, as indicated by offdacl,
 			 * require SE_DACL_PRESENT
 			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
