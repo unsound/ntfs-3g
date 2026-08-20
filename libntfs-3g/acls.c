@@ -3759,14 +3759,22 @@ const SID *ntfs_acl_owner(const char *securattr)
 		acecnt = le16_to_cpu(pacl->ace_count);
 		offace = offdacl + sizeof(ACL);
 		nace = 0;
-		do {
+			/*
+			 * Test the count before reading an ACE. An empty ACL
+			 * has none to read and the bytes which would hold the
+			 * first one are not part of the ACL. valid_acl() has
+			 * not checked them either because it had no ACE to
+			 * walk.
+			 */
+		while (!found && (nace < acecnt)) {
 			pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 			if ((pace->mask & WRITE_OWNER)
 			   && (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 			   && ntfs_is_user_sid(&pace->sid))
 				found = TRUE;
 			offace += le16_to_cpu(pace->size);
-		} while (!found && (++nace < acecnt));
+			nace++;
+		}
 	}
 	if (found)
 		usid = &pace->sid;
