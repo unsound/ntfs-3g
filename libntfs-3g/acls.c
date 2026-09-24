@@ -560,7 +560,9 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 			pace = (const ACCESS_ALLOWED_ACE*)
 				&((const char*)pacl)[offace];
 			acesz = le16_to_cpu(pace->size);
-			switch (pace->type) {
+			if (acesz < sizeof(ACE_HEADER))
+				ok = FALSE;
+			else switch (pace->type) {
 			case ACCESS_ALLOWED_ACE_TYPE :
 			case ACCESS_DENIED_ACE_TYPE :
 				wantsz = ntfs_sid_size(&pace->sid) + 8;
@@ -593,6 +595,59 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 		}
 	}
 	return (ok);
+}
+
+/**
+ * sid_at_standard_offset - check whether an ACE keeps its SID where expected
+ * @pace:	the ACE to check
+ *
+ * Most ACE types keep the SID just after the header and the access mask :
+ *
+ *      | header | mask |              SID              |
+ *      |========|======|===============================|
+ *      0        4      8
+ *
+ * The object types first keep a flag word and up to two GUIDs. The flags tell
+ * which of the GUIDs are present so the SID may begin at 12 or 28 or 44 :
+ *
+ *      | header | mask | flags | object type | inherited object type | SID |
+ *      |========|======|=======|=============|=======================|=====|
+ *      0        4      8      12            28                      44
+ *
+ * So for an object type the SID cannot even be located from the type alone.
+ *
+ * The types listed below are the ones whose SID valid_acl() has checked, so
+ * for them the SID is known to lie within the ACE. The others either move the
+ * SID as shown above or are reserved with no defined layout, and for those the
+ * bytes at the standard offset are not a SID and must not be read as one.
+ *
+ * The list is the set of types in MS-DTYP section 2.4.4.1 which are neither an
+ * object type nor reserved. It has to be kept in step with valid_acl().
+ *
+ * Return TRUE if the SID is at the standard offset and FALSE otherwise.
+ */
+
+static BOOL sid_at_standard_offset(const ACCESS_ALLOWED_ACE *pace)
+{
+	BOOL standard;
+
+	switch (pace->type) {
+	case ACCESS_ALLOWED_ACE_TYPE :
+	case ACCESS_DENIED_ACE_TYPE :
+	case SYSTEM_AUDIT_ACE_TYPE :
+	case ACCESS_ALLOWED_CALLBACK_ACE_TYPE :
+	case ACCESS_DENIED_CALLBACK_ACE_TYPE :
+	case SYSTEM_AUDIT_CALLBACK_ACE_TYPE :
+	case SYSTEM_MANDATORY_LABEL_ACE_TYPE :
+	case SYSTEM_RESOURCE_ATTRIBUTE_ACE_TYPE :
+	case SYSTEM_SCOPED_POLICY_ID_ACE_TYPE :
+		standard = TRUE;
+		break;
+	default :
+		standard = FALSE;
+		break;
+	}
+	return (standard);
 }
 
 /*
@@ -657,6 +712,30 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 		&& ntfs_valid_sid((const SID*)&securattr[offowner])
 		&& ntfs_valid_sid((const SID*)&securattr[offgroup])
 			/*
+			 * Check that the owner and group SIDs, and the ACLs,
+			 * end within the allocated storage.
+			 *
+			 * ntfs_attr_size() cannot be relied on for this. It
+			 * only takes a field into account when the field lies
+			 * beyond the ones examined before it, so a field at a
+			 * lower offset is left out of the size it returns. The
+			 * owner SID is the usual case, as it is placed before
+			 * the group SID in most descriptors.
+			 *
+			 * The SID sizes are known sane here because
+			 * ntfs_valid_sid() has just bounded the sub authority
+			 * count, and the ACL sizes are readable because the
+			 * ACL headers were checked to be within storage.
+			 */
+		&& ((offowner + (unsigned int)ntfs_sid_size((const SID*)
+				&securattr[offowner])) <= attrsz)
+		&& ((offgroup + (unsigned int)ntfs_sid_size((const SID*)
+				&securattr[offgroup])) <= attrsz)
+		&& (!offdacl
+				|| ((offdacl + le16_to_cpu(pdacl->size)) <= attrsz))
+		&& (!offsacl
+				|| ((offsacl + le16_to_cpu(psacl->size)) <= attrsz))
+			/*
 			 * if there is an ACL, as indicated by offdacl,
 			 * require SE_DACL_PRESENT
 			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
@@ -681,6 +760,87 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 	return (ok);
 }
 
+/**
+ * ntfs_inherit_acl_extra_size: compute creator SID inheritance slack
+ * @acl: ACL to scan
+ * @usid: owner SID to substitute for CREATOR_OWNER
+ * @gsid: group SID to substitute for CREATOR_GROUP
+ *
+ * Walks @acl bounded by acl->size, adding slack for ALLOW and DENY ACEs
+ * whose SID matches either creator placeholder.  ntfs_inherit_acl() can
+ * replace those placeholders by @usid or @gsid and, for directories, can
+ * also keep a verbatim copy for child inheritance.  Count the worst-case
+ * extra bytes so the inherited descriptor allocation cannot be overrun.
+ *
+ * Return: extra bytes needed, or 0 if @acl is NULL or structurally rejected.
+ */
+
+int ntfs_inherit_acl_extra_size(const ACL *acl,
+			const SID *usid, const SID *gsid)
+{
+	const ACCESS_ALLOWED_ACE *ace;
+	unsigned int off;
+	unsigned int acl_size;
+	unsigned int acesz;
+	unsigned int sidsz;
+	int usidsz;
+	int gsidsz;
+	int ownersidsz;
+	int groupsidsz;
+	int oldcnt;
+	int nace;
+	int extra;
+	BOOL usid_is_group_sid;
+
+	extra = 0;
+	if (!acl || !usid || !gsid)
+		return (0);
+	acl_size = le16_to_cpu(acl->size);
+	if (acl_size < sizeof(ACL))
+		return (0);
+	oldcnt = le16_to_cpu(acl->ace_count);
+	usidsz = ntfs_sid_size(usid);
+	gsidsz = ntfs_sid_size(gsid);
+	ownersidsz = sizeof(ownersidbytes);
+	groupsidsz = sizeof(groupsidbytes);
+	usid_is_group_sid = ntfs_same_sid(usid, groupsid);
+	off = sizeof(ACL);
+	for (nace = 0; nace < oldcnt; nace++) {
+		if (off + 8 > acl_size)
+			break;
+		ace = (const ACCESS_ALLOWED_ACE*)((const char*)acl + off);
+		acesz = le16_to_cpu(ace->size);
+		if (acesz < 8 || acesz > acl_size - off)
+			break;
+		switch (ace->type) {
+		case ACCESS_ALLOWED_ACE_TYPE :
+		case ACCESS_DENIED_ACE_TYPE :
+			if ((acesz >= 8 + sizeof(ownersidbytes))
+					&& ntfs_valid_sid(&ace->sid)) {
+				sidsz = ntfs_sid_size(&ace->sid);
+				if (sidsz <= acesz - 8) {
+					if (ntfs_same_sid(&ace->sid, ownersid))
+					{
+						extra += usidsz	- ownersidsz +
+								20;
+						if (usid_is_group_sid)
+							extra += gsidsz	-
+								groupsidsz + 20;
+					}
+					if (ntfs_same_sid(&ace->sid, groupsid))
+						extra += gsidsz	- groupsidsz +
+								20;
+				}
+			}
+			break;
+		default :
+			break;
+		}
+		off += acesz;
+	}
+	return extra;
+}
+
 /*
  *		Copy the inheritable parts of an ACL
  *
@@ -702,6 +862,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	int usidsz;
 	int gsidsz;
 	BOOL acceptable;
+	BOOL cancreator;
+	int withcrowner, withcrgroup;
 	const ACCESS_ALLOWED_ACE *poldace;
 	ACCESS_ALLOWED_ACE *pnewace;
 	ACCESS_ALLOWED_ACE *pauthace;
@@ -722,6 +884,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	selection = (fordir ? CONTAINER_INHERIT_ACE : OBJECT_INHERIT_ACE);
 	newcnt = 0;
 	oldcnt = le16_to_cpu(oldacl->ace_count);
+	withcrowner = withcrgroup = 0;
 	for (nace = 0; nace < oldcnt; nace++) {
 		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
@@ -843,6 +1006,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			/*
 			 * Inheritance for access, specific to
 			 * creator-owner (and creator-group)
+			 * Only one ACCESS_ALLOWED_ACE_TYPE and
+			 * one ACCESS_DENIED_ACE_TYPE are allowed
+			 * and this must be checked to defend
+			 * against possible buffer overflows.
 			 */
 		if ((fordir || !inherited
 			|| (poldace->flags
@@ -856,7 +1023,12 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				 * creator-group by owner and group
 				 * (but keep for further inheritance)
 				 */
-			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
+			cancreator = (pnewace->type == ACCESS_ALLOWED_ACE_TYPE)
+				|| (pnewace->type == ACCESS_DENIED_ACE_TYPE);
+			if (ntfs_same_sid(&pnewace->sid, ownersid)
+				&& cancreator
+				&& !(withcrowner & (1 << pnewace->type))) {
+				withcrowner |= 1 << pnewace->type;
 				memcpy(&pnewace->sid, usid, usidsz);
 				pnewace->size = cpu_to_le16(usidsz + 8);
 					/* remove inheritance flags */
@@ -874,7 +1046,10 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 					newcnt++;
 				}
 			}
-			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
+			if (ntfs_same_sid(&pnewace->sid, groupsid)
+				&& cancreator
+				&& !(withcrgroup & (1 << pnewace->type))) {
+				withcrgroup |= 1 << pnewace->type;
 				memcpy(&pnewace->sid, gsid, gsidsz);
 				pnewace->size = cpu_to_le16(gsidsz + 8);
 					/* remove inheritance flags */
@@ -3220,7 +3395,8 @@ static int build_std_permissions(const char *securattr,
 	}
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (!(pace->flags & INHERIT_ONLY_ACE)) {
+		if (!(pace->flags & INHERIT_ONLY_ACE)
+		   && sid_at_standard_offset(pace)) {
 			if (ntfs_same_sid(usid, &pace->sid)
 			  || ntfs_same_sid(ownersid, &pace->sid)) {
 				noown = FALSE;
@@ -3310,7 +3486,8 @@ static int build_owngrp_permissions(const char *securattr,
 	}
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (!(pace->flags & INHERIT_ONLY_ACE)) {
+		if (!(pace->flags & INHERIT_ONLY_ACE)
+		   && sid_at_standard_offset(pace)) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			    && (pace->mask & WRITE_OWNER)) {
@@ -3501,7 +3678,8 @@ static int build_ownadmin_permissions(const char *securattr,
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (!(pace->flags & INHERIT_ONLY_ACE)
-		   && !(~pace->mask & (ROOT_OWNER_UNMARK | ROOT_GROUP_UNMARK))) {
+		   && !(~pace->mask & (ROOT_OWNER_UNMARK | ROOT_GROUP_UNMARK))
+		   && sid_at_standard_offset(pace)) {
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			     && (((pace->mask & WRITE_OWNER) && firstapply))) {
@@ -3581,14 +3759,22 @@ const SID *ntfs_acl_owner(const char *securattr)
 		acecnt = le16_to_cpu(pacl->ace_count);
 		offace = offdacl + sizeof(ACL);
 		nace = 0;
-		do {
+			/*
+			 * Test the count before reading an ACE. An empty ACL
+			 * has none to read and the bytes which would hold the
+			 * first one are not part of the ACL. valid_acl() has
+			 * not checked them either because it had no ACE to
+			 * walk.
+			 */
+		while (!found && (nace < acecnt)) {
 			pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 			if ((pace->mask & WRITE_OWNER)
 			   && (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 			   && ntfs_is_user_sid(&pace->sid))
 				found = TRUE;
 			offace += le16_to_cpu(pace->size);
-		} while (!found && (++nace < acecnt));
+			nace++;
+		}
 	}
 	if (found)
 		usid = &pace->sid;
@@ -3771,6 +3957,16 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 			pctx = &ctx[0];
 		}
 		ignore = FALSE;
+			/*
+			 * Only look for a SID at the standard offset when the
+			 * ACE type keeps one there. An ACE which does not
+			 * could never contribute to the Posix ACL below, as
+			 * that needs an allow or deny type.
+			 */
+		if (!sid_at_standard_offset(pace)) {
+			offace += le16_to_cpu(pace->size);
+			continue;
+		}
 			/*
 			 * grants for root as a designated user or group
 			 */
