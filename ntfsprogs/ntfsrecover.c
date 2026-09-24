@@ -276,9 +276,14 @@ struct ATTR *getattrentry(unsigned int key, unsigned int lth)
 	if ((low < attrcount) && (attrtable[low]->key == key)) {
 		pa = attrtable[low];
 		if (pa->namelen < lth) {
-			pa = (struct ATTR*)realloc(pa,
+			struct ATTR *tmp;
+
+			tmp = (struct ATTR*)realloc(pa,
 					sizeof(struct ATTR) + lth);
-			attrtable[low] = pa;
+			if (tmp) {
+				pa = tmp;
+				attrtable[low] = pa;
+			}
 		}
 	} else {
 		mid = low + 1;
