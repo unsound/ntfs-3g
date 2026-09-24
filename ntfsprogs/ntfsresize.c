@@ -1792,17 +1792,21 @@ static runlist *alloc_cluster(struct bitmap *bm,
 	}
 
 	while (items > 0) {
+		runlist *tmp;
 
 		if (runs)
 			hint = 0;
 		rle.length = items;
-		if (find_free_cluster(bm, &rle, nr_vol_clusters, hint) == -1)
-			return NULL;
+		if (find_free_cluster(bm, &rle, nr_vol_clusters, hint) == -1) {
+			goto err;
+		}
 
 		rl_size = (runs + 2) * sizeof(runlist_element);
-		if (!(rl = (runlist *)realloc(rl, rl_size)))
-			return NULL;
+		if (!(tmp = (runlist *)realloc(rl, rl_size))) {
+			goto err;
+		}
 
+		rl = tmp;
 		rl_set(rl + runs, vcn, rle.lcn, rle.length);
 
 		vcn += rle.length;
@@ -1817,6 +1821,11 @@ static runlist *alloc_cluster(struct bitmap *bm,
 		dump_runlist(rl);
 	}
 	return rl;
+err:
+	if (rl) {
+		free(rl);
+	}
+	return NULL;
 }
 
 static int read_all(struct ntfs_device *dev, void *buf, int count)
