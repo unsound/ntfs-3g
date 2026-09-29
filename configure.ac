@@ -534,7 +534,7 @@ AC_CHECK_DECL(
 		[HAVE_OPTRESET],
 		[1],
 		[Defined to 1 if the 'optreset' global variable is present.]
-	)
+	),
 	,
 	[#include <getopt.h>]
 )
