@@ -1693,7 +1693,7 @@ int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
 	CFRange rangeToProcess;
 	CFIndex requiredBufferLength;
 	char *result = NULL;
-	int resultLength = -1;
+	CFIndex resultLength = -1;
 	
 	/* Convert the UTF-8 string to a CFString. */
 	cfSourceString = CFStringCreateWithCString(kCFAllocatorDefault,
@@ -1725,6 +1725,10 @@ int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
 		&requiredBufferLength) > 0)
 	{
 		resultLength = sizeof(char) * (requiredBufferLength + 1);
+		if(resultLength > INT_MAX) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
 		result = ntfs_calloc(resultLength);
 
 		if (result != NULL) {
@@ -1741,8 +1745,9 @@ int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
 			}
 		}
 		else {
-			ntfs_log_error("Could not perform a ntfs_calloc of %d "
-				"bytes for char *result.\n", resultLength);
+			ntfs_log_error("Could not perform a ntfs_calloc of "
+				"%lld bytes for char *result.\n",
+				(long long)resultLength);
 		}
 	}
 	else {
@@ -1754,7 +1759,7 @@ int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
 
 	if (result != NULL) {
 	 	*target = result;
-		return resultLength - 1;
+		return (int)(resultLength - 1);
 	}
 	else {
 		return -1;
