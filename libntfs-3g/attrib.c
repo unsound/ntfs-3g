@@ -7072,20 +7072,25 @@ int ntfs_attr_data_read(ntfs_inode *ni,
 	if ((size_t)offset < (size_t)na->data_size) {
 		if (offset + size > (size_t)na->data_size)
 			size = na->data_size - offset;
+		if (size > INT_MAX) {
+			size = INT_MAX;
+		}
 		while (size) {
-			res = ntfs_attr_pread(na, offset, size, buf + total);
-			if ((off_t)res < (off_t)size)
+			const s64 read_res =
+				ntfs_attr_pread(na, offset, size, buf + total);
+			if (read_res < (s64)size)
 				ntfs_log_perror("ntfs_attr_pread partial read "
-					"(%lld : %lld <> %d)",
+					"(%lld : %lld <> %lld)",
 					(long long)offset,
-					(long long)size, res);
-			if (res <= 0) {
+					(long long)size,
+					(long long)read_res);
+			if (read_res <= 0) {
 				res = -errno;
 				goto exit;
 			}
-			size -= res;
-			offset += res;
-			total += res;
+			size -= (unsigned int)read_res;
+			offset += (int)read_res;
+			total += (int)read_res;
 		}
 	}
 	res = total;
