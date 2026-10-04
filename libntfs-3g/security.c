@@ -287,10 +287,12 @@ int ntfs_sid_to_mbs_size(const SID *sid)
  */
 char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 {
-	u64 u;
-	le32 leauth;
+	size_t cnt;
 	char *s;
-	int i, j, cnt;
+	u64 u;
+	int i;
+	int j;
+	le32 leauth;
 
 	/*
 	 * No need to check @sid if !@sid_str since ntfs_sid_to_mbs_size() will
@@ -302,9 +304,11 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 	}
 	/* Allocate string if not provided. */
 	if (!sid_str) {
-		cnt = ntfs_sid_to_mbs_size(sid);
-		if (cnt < 0)
+		const int mbs_size = ntfs_sid_to_mbs_size(sid);
+		if (mbs_size < 0) {
 			return NULL;
+		}
+		cnt = (size_t)mbs_size;
 		s = (char*)ntfs_malloc(cnt);
 		if (!s)
 			return s;
