@@ -994,7 +994,12 @@ static int remove_reparse_index(ntfs_attr *na, ntfs_index_context *xr,
 	le16 seqn;
 	int ret;
 
-	ret = na->data_size;
+	if (na->data_size > INT_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	ret = (int)na->data_size;
 	if (ret) {
 			/* read the existing reparse_tag */
 		size = ntfs_attr_pread(na, 0, 4, preparse_tag);
