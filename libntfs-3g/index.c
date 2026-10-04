@@ -1192,9 +1192,11 @@ static void ntfs_ir_nill(INDEX_ROOT *ir)
 static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 			     INDEX_ENTRY *median, VCN new_vcn)
 {
+	int ret;
 	u8 *ies_end;
 	INDEX_ENTRY *ie_head;		/* first entry after the median */
-	int tail_size, dst_capacity, ret;
+	u32 tail_size;
+	int dst_capacity;
 	INDEX_BLOCK *dst;
 	
 	ntfs_log_trace("Entering\n");
@@ -1207,7 +1209,7 @@ static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	ie_head = ntfs_ie_get_next(median);
 	
 	ies_end = (u8 *)ntfs_ie_get_end(&src->index);
-	tail_size = ies_end - (u8 *)ie_head;
+	tail_size = (u32)(ies_end - (u8 *)ie_head);
 	dst_capacity = (int)(le32_to_cpu(dst->index.allocated_size)
 			     - le32_to_cpu(dst->index.entries_offset));
 
