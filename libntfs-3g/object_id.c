@@ -276,7 +276,12 @@ static int remove_object_id_index(ntfs_attr *na, ntfs_index_context *xo,
 	s64 size;
 	int ret;
 
-	ret = na->data_size;
+	if (na->data_size > INT_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	ret = (int)na->data_size;
 	if (ret) {
 			/* read the existing object id attribute */
 		size = ntfs_attr_pread(na, 0, sizeof(GUID), old_attr);
