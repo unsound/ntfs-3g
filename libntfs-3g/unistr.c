@@ -1028,9 +1028,14 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 {
 #ifdef MB_CUR_MAX
 	ntfschar *ucs;
+	size_t ins_size;
 	const char *s;
+	size_t ins_len;
+	size_t ucs_len;
+	size_t i;
+	size_t o;
+	size_t cnt;
 	wchar_t wc;
-	int i, o, cnt, ins_len, ucs_len, ins_size;
 #ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
 #endif
@@ -1064,8 +1069,8 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 	/* Eeek!!! DJGPP has broken mbstowcs() implementation!!! */
 	ins_len = strlen(ins);
 #endif
-	if (ins_len == -1)
-		return ins_len;
+	if (ins_len == (size_t)-1)
+		return -1;
 #ifdef HAVE_MBSINIT
 	if ((s != ins) || !mbsinit(&mbstate)) {
 #else
@@ -1104,10 +1109,10 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 #endif
 		if (!cnt)
 			break;
-		if (cnt == -1)
+		if (cnt == (size_t)-1)
 			goto err_out;
-		if (cnt < -1) {
-			ntfs_log_trace("Eeek. cnt = %i\n", cnt);
+		if ((ssize_t)cnt < -1) {
+			ntfs_log_trace("Eeek. cnt = %zu\n", cnt);
 			errno = EINVAL;
 			goto err_out;
 		}
@@ -1128,10 +1133,14 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 		goto err_out;
 	}
 #endif
+	if (o > INT_MAX) {
+		errno = ENAMETOOLONG;
+		goto err_out;
+	}
 	/* Now write the NULL character. */
 	ucs[o] = const_cpu_to_le16(L'\0');
 	*outs = ucs;
-	return o;
+	return (int)o;
 err_out:
 	free(ucs);
 #else /* MB_CUR_MAX */
