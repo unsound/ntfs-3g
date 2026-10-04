@@ -4377,7 +4377,7 @@ static SID *encodesid(const char *sidstr)
 	int cnt;
 	BIGSID bigsid;
 	SID *bsid;
-	u32 auth;
+	unsigned long auth;
 	const char *p;
 
 	sid = (SID*) NULL;
@@ -4386,14 +4386,20 @@ static SID *encodesid(const char *sidstr)
 		bsid->revision = SID_REVISION;
 		p = &sidstr[4];
 		auth = atoul(p);
+		if(auth > UINT32_MAX) {
+			goto out;
+		}
 		bsid->identifier_authority.high_part = const_cpu_to_be16(0);
-		bsid->identifier_authority.low_part = cpu_to_be32(auth);
+		bsid->identifier_authority.low_part = cpu_to_be32((u32)auth);
 		cnt = 0;
 		p = strchr(p, '-');
 		while (p && (cnt < 8)) {
 			p++;
 			auth = atoul(p);
-			bsid->sub_authority[cnt] = cpu_to_le32(auth);
+			if(auth > UINT32_MAX) {
+				goto out;
+			}
+			bsid->sub_authority[cnt] = cpu_to_le32((u32)auth);
 			p = strchr(p, '-');
 			cnt++;
 		}
@@ -4405,6 +4411,7 @@ static SID *encodesid(const char *sidstr)
 				memcpy(sid, bsid, 4 * cnt + 8);
 		}
 	}
+out:
 	return (sid);
 }
 
