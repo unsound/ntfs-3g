@@ -3515,13 +3515,20 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	rsize -= position;
 	if (size) {
 		if (size >= (size_t)rsize) {
-			res = ntfs_attr_pread(na, position, rsize, value);
-			if (res != rsize)
+			s64 read_size;
+			read_size = ntfs_attr_pread(na, position, rsize, value);
+			if (read_size != rsize)
 				res = -errno;
+			else if (read_size > INT_MAX) {
+				res = INT_MAX;
+			}
+			else {
+				res = (int)read_size;
+			}
 		} else
 			res = -ERANGE;
 	} else
-		res = rsize;
+		res = (rsize > INT_MAX) ? INT_MAX : (int)rsize;
 exit:
 	if (na)
 		ntfs_attr_close(na);
