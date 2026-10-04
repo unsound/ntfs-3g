@@ -116,8 +116,13 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 				       s64 count, int value)
 {
 	s64 bufsize, br;
+	s64 lastbyte_pos;
+	s64 tmp;
 	u8 *buf, *lastbyte_buf;
-	int bit, firstbyte, lastbyte, lastbyte_pos, tmp, ret = -1;
+	int bit;
+	int firstbyte;
+	int lastbyte;
+	int ret = -1;
 
 	if (!na || start_bit < 0 || count < 0) {
 		errno = EINVAL;
