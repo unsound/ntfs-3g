@@ -1159,7 +1159,7 @@ err_out:
 char *ntfs_uppercase_mbs(const char *low,
 			const ntfschar *upcase, u32 upcase_size)
 {
-	int size;
+	size_t size;
 	char *upp;
 	u32 wc;
 	int n;
