@@ -1259,7 +1259,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		errno = EINVAL;
 		goto error_exit;
 	}
-	vol->attrdef_len = na->data_size;
+	vol->attrdef_len = (int)na->data_size;
 	vol->attrdef = ntfs_malloc(na->data_size);
 	if (!vol->attrdef)
 		goto error_exit;
