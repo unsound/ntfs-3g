@@ -7118,19 +7118,24 @@ int ntfs_attr_data_write(ntfs_inode *ni, ntfschar *stream_name,
 		res = -errno;
 		goto exit;
 	}
+	if (size > INT_MAX) {
+		size = INT_MAX;
+	}
 	while (size) {
-		res = ntfs_attr_pwrite(na, offset, size, buf + total);
-		if (res < (s64)size)
+		const s64 write_res =
+			ntfs_attr_pwrite(na, offset, size, buf + total);
+		if (write_res < (s64)size)
 			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
-				"%lld <> %d)", (long long)offset,
-				(long long)size, res);
-		if (res <= 0) {
+				"%lld <> %lld)", (long long)offset,
+				(long long)size,
+				(long long)write_res);
+		if (write_res <= 0) {
 			res = -errno;
 			goto exit;
 		}
-		size -= res;
-		offset += res;
-		total += res;
+		size -= (unsigned int)write_res;
+		offset += (int)write_res;
+		total += (int)write_res;
 	}
 	res = total;
 exit:
