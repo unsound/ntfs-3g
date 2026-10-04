@@ -206,8 +206,8 @@ static int lookup_cache_inv_compare(const struct CACHED_GENERIC *cached,
 int ntfs_dir_lookup_hash(const struct CACHED_GENERIC *cached)
 {
 	const unsigned char *name;
-	int count;
-	unsigned int val;
+	size_t count;
+	size_t val;
 
 	name = (const unsigned char*)cached->variable;
 	count = cached->varsize;
