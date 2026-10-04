@@ -768,8 +768,12 @@ restart:
  */
 s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 {
-	s64 br, to_read, ofs, total, total2;
+	s64 total;
+	s64 total2;
+	s64 br;
 	u64 cb_size_mask;
+	u32 ofs;
+	u32 to_read;
 	VCN start_vcn, vcn, end_vcn;
 	ntfs_volume *vol;
 	runlist_element *rl;
@@ -778,7 +782,8 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	int err;
 	ATTR_FLAGS data_flags;
 	FILE_ATTR_FLAGS compression;
-	unsigned int nr_cbs, cb_clusters;
+	unsigned int cb_clusters;
+	s64 nr_cbs;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count 0x%llx.\n",
 			(unsigned long long)na->ni->mft_no, le32_to_cpu(na->type),
@@ -851,7 +856,7 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	 */
 	start_vcn = (pos & ~cb_size_mask) >> vol->cluster_size_bits;
 	/* Offset in the uncompressed cb at which to start reading data. */
-	ofs = pos & cb_size_mask;
+	ofs = (u32)(pos & cb_size_mask);
 	/*
 	 * The first vcn in the cb after the last cb which we need to
 	 * decompress.
@@ -882,7 +887,7 @@ do_next_cb:
 	if (rl->lcn == LCN_HOLE) {
 		/* Sparse cb, zero out destination range overlapping the cb. */
 		ntfs_log_debug("Found sparse compression block.\n");
-		to_read = min(count, cb_size - ofs);
+		to_read = (u32)min(count, cb_size - ofs);
 		memset(b, 0, to_read);
 		ofs = 0;
 		total += to_read;
@@ -903,7 +908,7 @@ do_next_cb:
 		 * NOTE: we have to modify data_size and initialized_size
 		 * temporarily as well...
 		 */
-		to_read = min(count, cb_size - ofs);
+		to_read = (u32)min(count, cb_size - ofs);
 		ofs += vcn << vol->cluster_size_bits;
 		NAttrClearCompressed(na);
 		na->data_flags &= ~ATTR_COMPRESSION_MASK;
@@ -1005,7 +1010,7 @@ do_next_cb:
 			*(u16*)cb_pos = 0;
 		ntfs_log_debug("Successfully read the compression block.\n");
 		/* Do not decompress beyond the requested block */
-		to_read = min(count, cb_size - ofs);
+		to_read = (u32)min(count, cb_size - ofs);
 		decompsz = ((ofs + to_read - 1) | (NTFS_SB_SIZE - 1)) + 1;
 		if (ntfs_decompress(dest, decompsz, cb, cb_size) < 0) {
 			err = errno;
