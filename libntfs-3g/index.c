@@ -1504,7 +1504,7 @@ static VCN ntfs_icx_parent_vcn(ntfs_index_context *icx)
 	return icx->parent_vcn[icx->pindex];
 }
 
-static VCN ntfs_icx_parent_pos(ntfs_index_context *icx)
+static int ntfs_icx_parent_pos(ntfs_index_context *icx)
 {
 	return icx->parent_pos[icx->pindex];
 }
