@@ -1600,11 +1600,14 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len, res;
-	s64 total = 0;
+	size_t total = 0;
 	s64 max_read;
 
 	if (!size)
 		return 0;
+	else if (size > INT_MAX) {
+		size = INT_MAX;
+	}
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -1667,7 +1670,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		total += ret;
 	}
 ok:
-	res = total;
+	res = (int)total;
 #ifndef DISABLE_PLUGINS
 stamps:
 #endif /* DISABLE_PLUGINS */
