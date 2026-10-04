@@ -260,11 +260,17 @@ int ntfs_get_ntfs_ea(ntfs_inode *ni, char *value, size_t size)
 	if (ntfs_attr_exist(ni, AT_EA, AT_UNNAMED, 0)) {
 		ea_buf = ntfs_attr_readall(ni, AT_EA, (ntfschar*)NULL, 0,
 					&ea_size);
-		if (ea_buf) {
+		if (ea_size > INT_MAX) {
+			ntfs_log_error("Unreasonably large EA in inode %lld: "
+					"%lld\n",
+					(long long)ni->mft_no,
+					(long long)ea_size);
+			res = -EINVAL;
+		} else if (ea_buf) {
 			if (value && (ea_size <= (s64)size))
 				memcpy(value, ea_buf, ea_size);
 			free(ea_buf);
-			res = ea_size;
+			res = (int)ea_size;
 		} else {
 			ntfs_log_error("Failed to read EA from inode %lld\n",
 					(long long)ni->mft_no);
