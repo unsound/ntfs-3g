@@ -863,10 +863,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			REPARSE_POINT *reparse;
 
 			res = CALL_REPARSE_PLUGIN(ni, getattr, stbuf);
-			if (!res) {
-				apply_umask(stbuf);
-				goto ok;
-			} else {
+			if (res) {
 				stbuf->st_size = ntfs_bad_reparse_lth;
 				stbuf->st_blocks =
 					(ni->allocated_size + 511) >> 9;
@@ -874,7 +871,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				res = 0;
 				goto ok;
 			}
-			goto exit;
+
+			apply_umask(stbuf);
+			goto ok;
 #else /* DISABLE_PLUGINS */
 			char *target;
 
