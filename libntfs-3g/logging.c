@@ -379,7 +379,7 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	if ((LOG_LINE_LEN > ret + 3) && (level & NTFS_LOG_LEVEL_PERROR)) {
 		strncat(logbuf, ": ", LOG_LINE_LEN - ret - 1);
 		strncat(logbuf, strerror(olderr), LOG_LINE_LEN - (ret + 3));
-		ret = strlen(logbuf);
+		ret = (int)strlen(logbuf);
 	}
 	
 	syslog(LOG_NOTICE, "%s", logbuf);
