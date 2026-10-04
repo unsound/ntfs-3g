@@ -1034,7 +1034,7 @@ static int ntfs_ibm_modify(ntfs_index_context *icx, VCN vcn, int set)
 {
 	u8 byte;
 	s64 pos = ntfs_ibm_vcn_to_pos(icx, vcn);
-	u32 bpos = pos / 8;
+	s64 bpos = pos / 8;
 	u32 bit = 1 << (pos % 8);
 	ntfs_attr *na;
 	int ret = STATUS_ERROR;
