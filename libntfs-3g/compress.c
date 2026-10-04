@@ -1764,7 +1764,8 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 	if ((*update_from < 0)
 	    || (compressed_part < 0)
 	    || (compressed_part > (int)na->compression_block_clusters)) {
-		ntfs_log_error("Bad update vcn or compressed_part %d for compressed write\n",
+		ntfs_log_error("Bad update vcn or compressed_part %d for "
+			"compressed write\n",
 			compressed_part);
 		errno = EIO;
 		return (-1);
@@ -1826,7 +1827,8 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 		while (brl->vcn && (brl->vcn > start_vcn)) {
 			/* jumping back a hole means big trouble */
 			if (brl->lcn == (LCN)LCN_HOLE) {
-				ntfs_log_error("jump back over a hole when appending\n");
+				ntfs_log_error("jump back over a hole when "
+						"appending\n");
 				fail = TRUE;
 				errno = EIO;
 			}
@@ -1914,7 +1916,8 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 			if ((wpos + rounded)
 			    > ((wrl->lcn + wrl->length)
 				 << vol->cluster_size_bits)) {
-				ntfs_log_error("writing on unallocated clusters\n");
+				ntfs_log_error("writing on unallocated "
+						"clusters\n");
 				errno = EIO;
 			} else {
 				written = ntfs_pwrite(vol->dev, wpos,
@@ -1990,7 +1993,8 @@ int ntfs_compressed_close(ntfs_attr *na, runlist_element *wrl, s64 offs,
 		fail = FALSE;
 		while (brl->vcn && (brl->vcn > start_vcn)) {
 			if (brl->lcn == (LCN)LCN_HOLE) {
-				ntfs_log_error("jump back over a hole when closing\n");
+				ntfs_log_error("jump back over a hole when "
+						"closing\n");
 				fail = TRUE;
 				errno = EIO;
 			}
@@ -2001,16 +2005,17 @@ int ntfs_compressed_close(ntfs_attr *na, runlist_element *wrl, s64 offs,
 			roffs = (start_vcn - brl->vcn)
 						<< vol->cluster_size_bits;
 			if (to_read) {
-				got = read_clusters(vol, brl, roffs, to_read,
-						 inbuf);
+				got = read_clusters(vol, brl, roffs,
+						(u32)to_read, inbuf);
 				if (got == to_read) {
 					written = ntfs_comp_set(na, brl, roffs,
-							to_read, inbuf);
+							(u32)to_read, inbuf);
 					if ((written >= 0)
 					/* free the unused clusters */
 					    && !ntfs_compress_free(na,brl,
-							written + roffs,
-							na->compression_block_size + roffs,
+							written + roffs, na->
+							compression_block_size +
+							roffs,
 							TRUE, update_from)) {
 						done = TRUE;
 					} else
