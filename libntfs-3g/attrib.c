@@ -1684,10 +1684,10 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 	int compressed_part = 0;
 	int cluster_size_bits = na->ni->vol->cluster_size_bits;
 	runlist_element *rl = *prl;
-	s32 endblock;
-	long long allocated;
+	s64 endblock;
+	s64 allocated;
 	runlist_element *zrl;
-	int irl;
+	size_t irl;
 	BOOL undecided;
 	BOOL nothole;
 
@@ -1800,8 +1800,9 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 		}
 		if (*prl) {
 			if (wasnonresident)
-				compressed_part = na->compression_block_clusters
-				   - zrl->length;
+				compressed_part =
+					(u8) (na->compression_block_clusters -
+					zrl->length);
 			xofs = 0;
 			if (ntfs_attr_fill_hole(na,
 				    zrl->length << cluster_size_bits,
