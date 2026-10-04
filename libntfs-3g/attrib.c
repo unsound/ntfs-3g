@@ -4538,7 +4538,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		ntfschar *name, u8 name_len, const u8 *val, s64 size)
 {
-	u32 attr_rec_size;
+	s64 attr_rec_size;
 	int err, i, offset;
 	BOOL is_resident;
 	BOOL can_be_non_resident = FALSE;
@@ -4665,8 +4665,14 @@ add_attr_record:
 		data_flags = const_cpu_to_le16(0);
 	if (is_resident) {
 		/* Add resident attribute. */
-		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
-				name_len, val, size, data_flags);
+		if (size > UINT32_MAX) {
+			offset = -1;
+			errno = ENOSPC;
+		} else {
+			offset = ntfs_resident_attr_record_add(attr_ni, type,
+					name, name_len, val, (u32)size,
+					data_flags);
+		}
 		if (offset < 0) {
 			if (errno == ENOSPC && can_be_non_resident)
 				goto add_non_resident;
