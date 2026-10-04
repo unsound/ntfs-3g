@@ -150,7 +150,8 @@ static s64 max_empty_bit_range(unsigned char *buf, int size)
 				if (bit) {
 					if (run > max_range) {
 						max_range = run;
-						start_pos = (s64)i * 8 + (j - run);
+						start_pos =
+							(s64)i * 8 + (j - run);
 					}
 					run = 0;
 				} else 
@@ -344,7 +345,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 					break;
 				}
 			} else {
-				lcn = max_empty_bit_range(buf, br);
+				lcn = max_empty_bit_range(buf, (int)br);
 				if (lcn < 0)
 					break;
 				has_guess = 1;
