@@ -140,7 +140,7 @@ static int inode_cache_compare(const struct CACHED_GENERIC *cached,
 static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
 			const struct CACHED_GENERIC *wanted)
 {
-	int len;
+	size_t len;
 	BOOL different;
 	const struct CACHED_INODE *w;
 	const struct CACHED_INODE *c;
