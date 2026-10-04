@@ -1895,7 +1895,9 @@ static char *getsecurityattr(ntfs_volume *vol, ntfs_inode *ni)
 		readallsz = 0;
 		securattr = ntfs_attr_readall(ni, AT_SECURITY_DESCRIPTOR,
 				AT_UNNAMED, 0, &readallsz);
-		if (securattr && !ntfs_valid_descr(securattr, readallsz)) {
+		if (securattr && ((readallsz < 0 || readallsz > UINT_MAX) ||
+			!ntfs_valid_descr(securattr, (unsigned)readallsz)))
+		{
 			ntfs_log_error("Bad security descriptor for inode %lld\n",
 				(long long)ni->mft_no);
 			free(securattr);
