@@ -1300,13 +1300,13 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 {
 	BOOL beginhole;
 	BOOL mergeholes;
-	s32 oldlength;
-	s32 freelength;
+	s64 oldlength;
+	s64 freelength;
 	s64 freelcn;
 	s64 freevcn;
 	runlist_element *freerl;
 	ntfs_volume *vol;
-	s32 carry;
+	s64 carry;
 	int res;
 
 	vol = na->ni->vol;
@@ -1413,7 +1413,8 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 					} while (erl-- != freerl);
 					freerl[1].lcn = freelcn + freecnt;
 					freerl[1].vcn = freevcn + freecnt;
-					freerl[1].length = oldlength - usedcnt - freecnt;
+					freerl[1].length =
+						oldlength - usedcnt - freecnt;
 				} else {
 					do {
 						erl[1] = *erl;
@@ -1490,7 +1491,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 			*++xrl = *frl++;
 		}
 		*++xrl = *frl; /* terminator */
-	na->compressed_size -= freed << vol->cluster_size_bits;
+		na->compressed_size -= freed << vol->cluster_size_bits;
 	}
 	return (res);
 }
