@@ -4260,7 +4260,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
 	ntfs_inode *base_ni;
-	int err, offset;
+	int err;
+	s32 offset;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld, "
 			"dataruns_size %d, flags 0x%x.\n",
@@ -4369,7 +4370,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		return -1;
 
 	}
-	offset = (u8*)ctx->attr - (u8*)ctx->mrec;
+	offset = (s32)((u8*)ctx->attr - (u8*)ctx->mrec);
 	ntfs_attr_put_search_ctx(ctx);
 	return offset;
 put_err_out:
