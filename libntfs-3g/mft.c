@@ -546,14 +546,14 @@ static int ntfs_is_mft(ntfs_inode *ni)
  * error code.  An error code of ENOSPC means that there are no free mft
  * records in the currently initialized mft bitmap.
  */
-static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
+static s64 ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 {
+	s64 size;
 	s64 pass_end, ll, data_pos, pass_start, ofs, bit;
+	s64 ret = -1;
 	ntfs_attr *mftbmp_na;
 	u8 *buf, *byte;
-	unsigned int size;
 	u8 pass, b;
-	int ret = -1;
 
 	ntfs_log_enter("Entering\n");
 	
@@ -619,9 +619,10 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 			size = ll << 3;
 			bit = data_pos & 7;
 			data_pos &= ~7ull;
-			ntfs_log_debug("Before inner for loop: size 0x%x, "
+			ntfs_log_debug("Before inner for loop: size 0x%llx, "
 					"data_pos 0x%llx, bit 0x%llx, "
-					"*byte 0x%hhx, b %u.\n", size,
+					"*byte 0x%hhx, b %u.\n",
+					(long long)size,
 					(long long)data_pos, (long long)bit,
 					(u8) (byte ? *byte : -1), b);
 			for (; bit < size && data_pos + bit < pass_end;
@@ -639,16 +640,17 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 					continue;
 				
 				/* Note: ffz() result must be zero based. */
-				b = ntfs_ffz((unsigned long)*byte);
+				b = ntfs_ffz((unsigned int)*byte);
 				if (b < 8 && b >= (bit & 7)) {
 					free(buf);
 					ret = data_pos + (bit & ~7ull) + b;
 					goto leave;
 				}
 			}
-			ntfs_log_debug("After inner for loop: size 0x%x, "
+			ntfs_log_debug("After inner for loop: size 0x%llx, "
 					"data_pos 0x%llx, bit 0x%llx, "
-					"*byte 0x%hhx, b %u.\n", size,
+					"*byte 0x%hhx, b %u.\n",
+					(long long)size,
 					(long long)data_pos, (long long)bit,
 					(u8) (byte ? *byte : -1), b);
 			data_pos += size;
