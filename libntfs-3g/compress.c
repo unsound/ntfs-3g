@@ -1296,7 +1296,7 @@ static BOOL valid_compressed_run(ntfs_attr *na, runlist_element *rl,
  */
 
 static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
-			s32 usedcnt, s32 freecnt, VCN *update_from)
+			s64 usedcnt, s64 freecnt, VCN *update_from)
 {
 	BOOL beginhole;
 	BOOL mergeholes;
@@ -1330,7 +1330,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 		freerl = ++rl;
 	}
 	if (!mergeholes && (usedcnt || beginhole)) {
-		s32 freed;
+		s64 freed;
 		runlist_element *frl;
 		runlist_element *erl;
 		int holes = 0;
@@ -1455,7 +1455,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 			break;
 		}
 	} else {
-		s32 freed;
+		s64 freed;
 		runlist_element *frl;
 		runlist_element *xrl;
 
@@ -1512,12 +1512,12 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 				s64 used, s64 reserved, BOOL appending,
 				VCN *update_from)
 {
-	s32 freecnt;
-	s32 usedcnt;
+	s64 freecnt;
+	s64 usedcnt;
 	int res;
 	s64 freelcn;
 	s64 freevcn;
-	s32 freelength;
+	s64 freelength;
 	BOOL mergeholes;
 	BOOL beginhole;
 	ntfs_volume *vol;
@@ -1557,7 +1557,7 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 						&& rl[0].vcn
 						&& (rl[-1].lcn == LCN_HOLE);
 				if (mergeholes) {
-					s32 carry;
+					s64 carry;
 
 				/* shorten the runs which have free space */
 					carry = freecnt;
@@ -1569,7 +1569,7 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 					freerl->length = carry;
 					freerl = rl;
 				} else {
-					rl->length = usedcnt; /* can be zero ? */
+					rl->length = usedcnt;/* can be zero ? */
 					freerl = ++rl;
 				}
 				if ((freelength > 0)
