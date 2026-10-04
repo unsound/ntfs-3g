@@ -2518,7 +2518,7 @@ int ntfs_attr_pclose(ntfs_attr *na)
 			if (rl->length < na->compression_block_clusters)
 				compressed_part
         	                        = na->compression_block_clusters
-                	                           - rl->length;
+                	                           - (u8) rl->length;
 			else
 				compressed_part
 					= na->compression_block_clusters;
