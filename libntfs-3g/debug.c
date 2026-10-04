@@ -59,12 +59,12 @@ void ntfs_debug_runlist_dump(const runlist_element *rl)
 		LCN lcn = (rl + i)->lcn;
 
 		if (lcn < (LCN)0) {
-			int idx = -lcn - 1;
+			s64 idx = -lcn - 1;
 
 			if (idx > -LCN_EINVAL - 1)
 				idx = 4;
 			ntfs_log_debug("%-16lld %s %-16lld%s\n", 
-				       (long long)rl[i].vcn, lcn_str[idx], 
+				       (long long)rl[i].vcn, lcn_str[(int)idx],
 				       (long long)rl[i].length, 
 				       rl[i].length ? "" : " (runlist end)");
 		} else
