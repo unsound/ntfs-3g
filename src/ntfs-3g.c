@@ -4345,7 +4345,7 @@ static int set_fuseblk_options(char **parsed_options)
 		pagesize = 4096;
 	
 	if (blksize > (u32)pagesize)
-		blksize = pagesize;
+		blksize = (u32)pagesize;
 	
 	snprintf(options, sizeof(options), ",blkdev,blksize=%u", blksize);
 	if (ntfs_strappend(parsed_options, options))
