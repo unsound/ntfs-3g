@@ -302,7 +302,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 			       (long long)l);
 		goto io_error_exit;
 	}
-	vol->mft_ni->attr_list_size = l;
+	vol->mft_ni->attr_list_size = (u32)l;
 	vol->mft_ni->attr_list = ntfs_malloc(l);
 	if (!vol->mft_ni->attr_list)
 		goto error_exit;
