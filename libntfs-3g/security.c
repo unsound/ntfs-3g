@@ -1265,7 +1265,7 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	char c;
 	int matched;
 	BOOL ismember;
-	int got;
+	ssize_t got;
 	char *p;
 	gid_t grp;
 	pid_t tid;
