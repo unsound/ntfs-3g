@@ -370,7 +370,7 @@ void ntfs_generate_guid(GUID *guid)
 	u8 *p = (u8 *)guid;
 
 	/* this is called at most once from mkntfs */
-	srandom(time((time_t*)NULL) ^ (getpid() << 16));
+	srandom((unsigned int)(time((time_t*)NULL) ^ (getpid() << 16)));
 	for (i = 0; i < sizeof(GUID); i++) {
 		p[i] = (u8)(random() & 0xFF);
 		if (i == 7)
