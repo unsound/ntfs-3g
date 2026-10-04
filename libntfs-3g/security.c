@@ -1807,8 +1807,8 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 		le64 all;
 	} realign;
 	int found;
+	int rdsize;
 	size_t size;
-	size_t rdsize;
 	s64 offs;
 	ntfs_inode *ni;
 	ntfs_index_context *xsii;
