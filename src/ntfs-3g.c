@@ -2700,7 +2700,8 @@ cleanup:
 
 static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_path)
 {
-	int ret, len;
+	int ret;
+	size_t len;
 	char *tmp;
 	const char *ext = ".ntfs-3g-";
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -2708,15 +2709,19 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 #endif
 
 	ntfs_log_trace("Entering\n");
-	
+
 	len = strlen(new_path) + strlen(ext) + 10 + 1; /* wc(str(2^32)) + \0 */
+	if (len > INT_MAX) {
+		return -EOVERFLOW;
+	}
+
 	tmp = ntfs_malloc(len);
 	if (!tmp)
 		return -errno;
-	
+
 	ret = snprintf(tmp, len, "%s%s%010d", new_path, ext, ++ntfs_sequence);
-	if (ret != len - 1) {
-		ntfs_log_error("snprintf failed: %d != %d\n", ret, len - 1);
+	if (ret < 0 || (size_t) ret != len - 1) {
+		ntfs_log_error("snprintf failed: %d != %zu\n", ret, len - 1);
 		ret = -EOVERFLOW;
 	} else {
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
@@ -2739,7 +2744,7 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 #endif
 	}
 	free(tmp);
-	return 	ret;
+	return ret;
 }
 
 #if FUSE_VERSION >= 30
