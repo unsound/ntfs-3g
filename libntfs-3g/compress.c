@@ -239,7 +239,8 @@ static void ntfs_best_match(struct COMPRESS_CONTEXT *pctx, const int i,
 out:
 	/* Return the longest match we were able to find.  */
 	pctx->size = best_len;
-	pctx->rel = best_matchptr - strptr; /* given as a negative number! */
+	pctx->rel =
+		(int)(best_matchptr - strptr); /* given as a negative number! */
 }
 
 /*
