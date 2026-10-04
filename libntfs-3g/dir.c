@@ -1300,7 +1300,7 @@ skip_index_root:
 		goto dir_err_out;
 	}
 
-	bmp_buf_size = min(bmp_na->data_size - (bmp_pos >> 3), 4096);
+	bmp_buf_size = (int)min(bmp_na->data_size - (bmp_pos >> 3), 4096);
 	bmp = ntfs_malloc(bmp_buf_size);
 	if (!bmp)
 		goto err_out;
@@ -1328,7 +1328,8 @@ find_next_index_buffer:
 		/* Read next chunk from the index bitmap. */
 		bmp_buf_pos = 0;
 		if ((bmp_pos >> 3) + bmp_buf_size > bmp_na->data_size)
-			bmp_buf_size = bmp_na->data_size - (bmp_pos >> 3);
+			bmp_buf_size =
+				(int)(bmp_na->data_size - (bmp_pos >> 3));
 		br = ntfs_attr_pread(bmp_na, bmp_pos >> 3, bmp_buf_size, bmp);
 		if (br != bmp_buf_size) {
 			if (br != -1)
