@@ -665,11 +665,11 @@ out:
  * On success return the number of deallocated clusters (not counting sparse
  * clusters) and on error return -1 with errno set to the error code.
  */
-int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
+s64 ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 {
 	runlist *rl;
 	s64 delta, to_free, nr_freed = 0;
-	int ret = -1;
+	s64 ret = -1;
 
 	if (!vol || !vol->lcnbmp_na || !na || start_vcn < 0 ||
 			(count < 0 && count != -1)) {
@@ -680,7 +680,8 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 	
 	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x, count 0x%llx, "
 		       "vcn 0x%llx.\n", (unsigned long long)na->ni->mft_no,
-		       le32_to_cpu(na->type), (long long)count, (long long)start_vcn);
+		       le32_to_cpu(na->type), (long long)count,
+		       (long long)start_vcn);
 
 	rl = ntfs_attr_find_vcn(na, start_vcn);
 	if (!rl) {
