@@ -911,7 +911,7 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 #ifdef MB_CUR_MAX
 	wchar_t wc;
 	int i, o;
-	int cnt = 0;
+	size_t cnt = 0;
 #ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
 #endif
@@ -967,10 +967,10 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 #else
 		cnt = wctomb(mbs + o, wc);
 #endif
-		if (cnt == -1)
+		if (cnt == (size_t)-1)
 			goto err_out;
 		if (cnt <= 0) {
-			ntfs_log_debug("Eeek. cnt <= 0, cnt = %i\n", cnt);
+			ntfs_log_debug("Eeek. cnt <= 0, cnt = %zu\n", cnt);
 			errno = EINVAL;
 			goto err_out;
 		}
