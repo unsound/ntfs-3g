@@ -4126,7 +4126,8 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	u32 length;
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
-	int err, offset;
+	int err;
+	s32 offset;
 	ntfs_inode *base_ni;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, flags 0x%x.\n",
@@ -4178,7 +4179,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Setup record fields. */
-	offset = ((u8*)a - (u8*)m);
+	offset = (s32)((u8*)a - (u8*)m);
 	a->type = type;
 	a->length = cpu_to_le32(length);
 	a->non_resident = 0;
