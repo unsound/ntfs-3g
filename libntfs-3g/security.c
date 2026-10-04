@@ -479,7 +479,7 @@ static int entersecurity_stuff(ntfs_volume *vol, off_t offs)
  */
 
 static int entersecurity_data(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
+			const SECURITY_DESCRIPTOR_RELATIVE *attr, int attrsz,
 			le32 hash, le32 keyid, off_t offs, int gap)
 {
 	int res;
@@ -622,7 +622,7 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
  */
 
 static le32 entersecurityattr(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
+			const SECURITY_DESCRIPTOR_RELATIVE *attr, int attrsz,
 			le32 hash)
 {
 	union {
