@@ -1088,9 +1088,10 @@ static u32 read_clusters(ntfs_volume *vol, const runlist_element *rl,
 static s32 write_clusters(ntfs_volume *vol, const runlist_element *rl,
 			s64 offs, s32 to_write, const char *outbuf)
 {
-	s32 count;
-	s32 put, xput;
+	s64 count;
 	s64 xpos;
+	s64 xput;
+	s32 put;
 	BOOL first;
 	const char *xoutbuf;
 	const runlist_element *xrl;
