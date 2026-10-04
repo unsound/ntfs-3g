@@ -727,7 +727,7 @@ static int utf8_to_utf16_size(const char *s)
 			}
 		}
 	}
-	ret = count;
+	ret = (int)count;
 out:
 	return ret;
 fail:
