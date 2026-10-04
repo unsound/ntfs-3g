@@ -1020,7 +1020,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 					 * symlink target as multibyte string */
 					len = ntfs_ucstombs(
 							intx_file->target,
-							(na->data_size -
+							(int) (na->data_size -
 							    offsetof(INTX_FILE,
 								     target)) /
 							       sizeof(ntfschar),
@@ -1249,7 +1249,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 	/* Convert link from unicode to local encoding. */
-	if (ntfs_ucstombs(intx_file->target, (na->data_size -
+	if (ntfs_ucstombs(intx_file->target, (int) (na->data_size -
 			offsetof(INTX_FILE, target)) / sizeof(ntfschar),
 			&buf, buf_size) < 0) {
 		res = -errno;
