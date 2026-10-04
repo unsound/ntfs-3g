@@ -1102,7 +1102,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		goto bad_upcase;
 	}
 	if (vol->upcase_len != na->data_size >> 1) {
-		vol->upcase_len = na->data_size >> 1;
+		/* Note: u32 cast is safe (0x2 <= na->data_size < 0x20002). */
+		vol->upcase_len = ((u32)na->data_size) >> 1;
 		/* Throw away default table. */
 		free(vol->upcase);
 		vol->upcase = ntfs_malloc(na->data_size);
