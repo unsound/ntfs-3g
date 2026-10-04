@@ -139,7 +139,8 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	ntfs_attr *na = NULL;
 	ntfs_attr_search_ctx *ctx;
 	u8 *new_al;
-	int entry_len, entry_offset, err;
+	ssize_t entry_offset;
+	int entry_len, err;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n",
 			(long long) ni->mft_no,
