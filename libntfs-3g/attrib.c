@@ -1540,8 +1540,8 @@ static int split_compressed_hole(ntfs_attr *na, runlist_element **prl,
 		 * Locate the update part relative to beginning of
 		 * current run
 		 */
-		int beginwrite = (pos >> cluster_size_bits) - rl->vcn;
-		s32 endblock = (((pos + count - 1) >> cluster_size_bits)
+		const s64 beginwrite = (pos >> cluster_size_bits) - rl->vcn;
+		const s64 endblock = (((pos + count - 1) >> cluster_size_bits)
 			| (na->compression_block_clusters - 1)) + 1 - rl->vcn;
 
 		compressed_part = na->compression_block_clusters
