@@ -2390,7 +2390,7 @@ static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 
 static int get_long_name(ntfs_inode *ni, u64 dnum, ntfschar *longname)
 {
-	size_t outsize = 0;
+	int outsize = 0;
 	int namecount = 0;
 	FILE_NAME_ATTR *fn;
 	ntfs_attr_search_ctx *ctx;
@@ -2427,22 +2427,23 @@ static int get_long_name(ntfs_inode *ni, u64 dnum, ntfschar *longname)
 		/* if not found search for POSIX names */
 	if (!outsize) {
 		ntfs_attr_reinit_search_ctx(ctx);
-	while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
-			0, NULL, 0, ctx)) {
-		/* We know this will always be resident. */
-		fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
-				le16_to_cpu(ctx->attr->value_offset));
+		while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0,
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+			/* We know this will always be resident. */
+			fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
+					le16_to_cpu(ctx->attr->value_offset));
 
-		if ((fn->file_name_type == FILE_NAME_POSIX)
-		    && (MREF_LE(fn->parent_directory) == dnum)) {
+			if ((fn->file_name_type == FILE_NAME_POSIX)
+			    && (MREF_LE(fn->parent_directory) == dnum)) {
 				/*
 				 * Found a POSIX name for the entry
 				 * copy name
 				 */
-			outsize = fn->file_name_length;
-			memcpy(longname,fn->file_name,outsize*sizeof(ntfschar));
+				outsize = fn->file_name_length;
+				memcpy(longname, fn->file_name,
+					outsize * sizeof(ntfschar));
+			}
 		}
-	}
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	return (outsize);
