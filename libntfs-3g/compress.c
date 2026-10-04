@@ -1046,8 +1046,8 @@ do_next_cb:
 static u32 read_clusters(ntfs_volume *vol, const runlist_element *rl,
 			s64 offs, u32 to_read, char *inbuf)
 {
-	u32 count;
-	int xgot;
+	s64 count;
+	s64 xgot;
 	u32 got;
 	s64 xpos;
 	BOOL first;
@@ -1057,7 +1057,7 @@ static u32 read_clusters(ntfs_volume *vol, const runlist_element *rl,
 	got = 0;
 	xrl = rl;
 	xinbuf = inbuf;
-	first = TRUE;
+	first = FALSE;
 	do {
 		count = xrl->length << vol->cluster_size_bits;
 		xpos = xrl->lcn << vol->cluster_size_bits;
@@ -1068,7 +1068,7 @@ static u32 read_clusters(ntfs_volume *vol, const runlist_element *rl,
 		if ((to_read - got) < count)
 			count = to_read - got;
 		xgot = ntfs_pread(vol->dev, xpos, count, xinbuf);
-		if (xgot == (int)count) {
+		if (xgot == count) {
 			got += count;
 			xpos += count;
 			xinbuf += count;
