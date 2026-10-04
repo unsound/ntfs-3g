@@ -2145,7 +2145,7 @@ static s64 ntfs_attr_pwrite_i(ntfs_attr *na, const s64 pos, s64 count,
 				 */
 				compressed_part
 					= na->compression_block_clusters
-					   - rl->length;
+					   - (u8) rl->length;
 			else {
 				/*
 				 * the needed block is in a hole bigger
