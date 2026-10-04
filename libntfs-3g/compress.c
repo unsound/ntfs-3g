@@ -1857,15 +1857,15 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 			if (!ntfs_read_append(na, brl, roffs, compsz,
 					(s32)(offs - roffs), appending,
 					outbuf, to_write, b)) {
-				written = ntfs_flush(na, brl, roffs,
-					outbuf, to_flush, compress, appending,
+				written = ntfs_flush(na, brl, roffs, outbuf,
+					(s32)to_flush, compress, appending,
 					update_from);
 				if (written >= 0) {
 					written = to_write;
 					done = TRUE;
 				}
 			}
-		free(outbuf);
+			free(outbuf);
 		}
 	} else {
 		if (compress && !fail) {
@@ -1878,13 +1878,14 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 				to_read = offs - roffs;
 				if (to_read)
 					got = read_clusters(vol, brl, roffs,
-							to_read, inbuf);
+							(u32)to_read, inbuf);
 				else
 					got = 0;
 				if (got == to_read) {
 					memcpy(&inbuf[to_read],b,to_write);
 					written = ntfs_comp_set(na, brl, roffs,
-						to_read + to_write, inbuf);
+						(u32)(to_read + to_write),
+						inbuf);
 				/*
 				 * if compression was not successful,
 				 * only write the part which was requested
