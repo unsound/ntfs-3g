@@ -144,10 +144,11 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		const s64 count, MFT_RECORD *b)
 {
+	s64 cnt = 0;
 	s64 bw;
 	VCN m;
 	void *bmirr = NULL;
-	int cnt = 0, res = 0;
+	int res = 0;
 
 	if (!vol || !vol->mft_na || vol->mftmirr_size <= 0 || !b || count < 0) {
 		errno = EINVAL;
