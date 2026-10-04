@@ -987,7 +987,11 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 			ntfs_log_perror("Failed to read $MFTMirr");
 			goto error_exit;
 		}
-		vol->mftmirr_size = l;
+		/* Note: Cast to int is safe since we supplied an int to
+		 * 'ntfs_mst_attr_pread' for the parameter 'bk_cnt' and the
+		 * function will never return a higher value than 'bk_cnt', only
+		 * a lower one (if fewer records than requested were read). */
+		vol->mftmirr_size = (int)l;
 	}
 	for (i = 0; (i < l) && (i < FILE_first_user); ++i)
 		if (ntfs_mft_record_check(vol, FILE_MFT + i,
