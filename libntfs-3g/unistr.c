@@ -867,7 +867,7 @@ static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 		t += m;
 	}
 	
-	ret = --outpos - *outs;
+	ret = (int)(--outpos - *outs);
 fail:
 #if defined(__APPLE__) || defined(__DARWIN__)
 #ifdef ENABLE_NFCONV
