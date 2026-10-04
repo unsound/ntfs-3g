@@ -1131,7 +1131,7 @@ static INDEX_BLOCK *ntfs_ir_to_ib(INDEX_ROOT *ir, VCN ib_vcn)
 	INDEX_BLOCK *ib;
 	INDEX_ENTRY *ie_last;
 	char *ies_start, *ies_end;
-	int i;
+	u32 i;
 	
 	ntfs_log_trace("Entering\n");
 
@@ -1147,7 +1147,7 @@ static INDEX_BLOCK *ntfs_ir_to_ib(INDEX_ROOT *ir, VCN ib_vcn)
 	 * Copy all entries, including the termination entry
 	 * as well, which can never have any data.
 	 */
-	i = (char *)ie_last - ies_start + le16_to_cpu(ie_last->length);
+	i = (u32)((char *)ie_last - ies_start + le16_to_cpu(ie_last->length));
 
 	if (offsetof(INDEX_BLOCK, index) + le32_to_cpu(ib->index.entries_offset)
 			+ i > ib_size)
