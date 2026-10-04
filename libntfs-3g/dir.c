@@ -2338,7 +2338,7 @@ ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni)
 
 static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 {
-	size_t outsize = 0;
+	int outsize = 0;
 	int namecount = 0;
 	FILE_NAME_ATTR *fn;
 	ntfs_attr_search_ctx *ctx;
