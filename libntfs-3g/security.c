@@ -3201,9 +3201,9 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 	int res;
 
 	res = -1;
-	if ((size > 0)
+	if ((size > 0) && (size <= UINT_MAX)
 	   && !(flags & XATTR_CREATE)
-	   && ntfs_valid_descr(value,size)
+	   && ntfs_valid_descr(value, (unsigned)size)
 	   && (ntfs_attr_size(value) == size)) {
 			/* need copying in order to write */
 		attr = (char*)ntfs_malloc(size);
