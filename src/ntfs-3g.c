@@ -1250,7 +1250,8 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 	/* Convert link from unicode to local encoding. */
 	if (ntfs_ucstombs(intx_file->target, (int) (na->data_size -
 			offsetof(INTX_FILE, target)) / sizeof(ntfschar),
-			&buf, buf_size) < 0) {
+			&buf,
+			(buf_size > INT_MAX) ? INT_MAX : (int) buf_size) < 0) {
 		res = -errno;
 		goto exit;
 	}
