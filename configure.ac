@@ -185,6 +185,13 @@ AC_ARG_ENABLE(
 	]
 )
 
+AC_ARG_ENABLE(
+	[fuse3],
+	[AS_HELP_STRING([--disable-fuse3],[disable building with libfuse3])],
+	[if test "x$enableval" = "xno"; then disable_fuse3="yes"; fi],
+	[]
+)
+
 # pthread_rwlock_t requires _GNU_SOURCE
 AC_GNU_SOURCE
 
@@ -319,15 +326,33 @@ elif test "${with_fuse}" = "external"; then
 	# Libraries often install their metadata .pc files in directories
 	# not searched by pkg-config. Let's workaround this. 
 	export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/lib/pkgconfig:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
-	PKG_CHECK_MODULES(
-		[FUSE_MODULE],
-		[fuse >= 2.6.0],
-		,
-		[
-			AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either older FUSE is still present, or FUSE is not fully installed (e.g. fuse, libfuse, libfuse2, libfuse-dev, etc packages). Source code: http://fuse.sf.net])
-		]
-	)
-	FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
+	if test "x${disable_fuse3}" != "xyes"; then
+		PKG_CHECK_MODULES(
+			[FUSE_MODULE],
+			[fuse3 >= 3.0.0],
+			[
+				FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse3 | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
+				FUSE_MODULE_CFLAGS="-DFUSE_USE_VERSION=30 $FUSE_MODULE_CFLAGS"
+			],
+			[]
+		)
+	fi
+
+	if test "x${FUSE_MODULE_CFLAGS}" == "x"; then
+		PKG_CHECK_MODULES(
+			[FUSE_MODULE],
+			[fuse >= 2.6.0],
+			[
+				FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
+				FUSE_MODULE_CFLAGS="-DFUSE_USE_VERSION=26 $FUSE_MODULE_CFLAGS"
+			],
+			[]
+		)
+	fi
+
+	if test "x${FUSE_MODULE_CFLAGS}" == "x"; then
+		AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either older FUSE is still present, or FUSE is not fully installed (e.g. fuse, libfuse, libfuse2, libfuse-dev, etc packages). Source code: http://fuse.sf.net])
+	fi
 fi
 
 # Autodetect whether we can build crypto stuff or not.

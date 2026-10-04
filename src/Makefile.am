@@ -4,7 +4,7 @@ EXTRA_DIST = ntfs-3g_common.h
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 if FUSE_INTERNAL
-FUSE_CFLAGS = -I$(top_srcdir)/include/fuse-lite
+FUSE_CFLAGS = -DFUSE_USE_VERSION=26 -I$(top_srcdir)/include/fuse-lite
 FUSE_LIBS   = $(top_builddir)/libfuse-lite/libfuse-lite.la
 else
 FUSE_CFLAGS = $(FUSE_MODULE_CFLAGS)
@@ -29,7 +29,6 @@ ntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
 endif
 ntfs_3g_CFLAGS   =			\
 	$(AM_CFLAGS) 			\
-	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
 	-I$(top_srcdir)/include/ntfs-3g	\
 	$(PLUGIN_CFLAGS)
@@ -41,7 +40,6 @@ lowntfs_3g_LDFLAGS  = $(AM_LDFLAGS) -all-static
 endif
 lowntfs_3g_CFLAGS   =			\
 	$(AM_CFLAGS) 			\
-	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
 	-I$(top_srcdir)/include/ntfs-3g	\
 	$(PLUGIN_CFLAGS)

@@ -170,7 +170,8 @@ enum {
 	CLOSE_COMPRESSED = 1,
 	CLOSE_ENCRYPTED = 2,
 	CLOSE_DMTIME = 4,
-	CLOSE_REPARSE = 8
+	CLOSE_REPARSE = 8,
+	CLOSE_CAN_TRUNCATE = 16
 };
 
 static struct ntfs_options opts;
@@ -675,7 +676,12 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 }
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
+#if FUSE_VERSION >= 30
+static void *ntfs_init(struct fuse_conn_info *conn,
+		struct fuse_config *config)
+#else
 static void *ntfs_init(struct fuse_conn_info *conn)
+#endif
 {
 #if defined(__APPLE__) || defined(__DARWIN__)
 	FUSE_ENABLE_XTIMES(conn);
@@ -697,6 +703,9 @@ static void *ntfs_init(struct fuse_conn_info *conn)
 #ifdef FUSE_CAP_IOCTL_DIR
 	conn->want |= FUSE_CAP_IOCTL_DIR;
 #endif /* defined(FUSE_CAP_IOCTL_DIR) */
+#if FUSE_VERSION >= 30
+	config->use_ino = 1;
+#endif
 	return NULL;
 }
 
@@ -802,7 +811,12 @@ static void apply_umask(struct stat *stbuf)
 
 #endif /* DISABLE_PLUGINS */
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf,
+		struct fuse_file_info *fi __attribute__((unused)))
+#else
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
+#endif
 {
 	int res = 0;
 	ntfs_inode *ni;
@@ -1283,7 +1297,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 #ifndef DISABLE_PLUGINS
 		ntfs_inode *ni;
 #endif /* DISABLE_PLUGINS */
-		 
+
 		switch (dt_type) {
 		case NTFS_DT_DIR :
 			st.st_mode = S_IFDIR | (0777 & ~ctx->dmask); 
@@ -1361,7 +1375,11 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		}
 #endif /* defined(__APPLE__) || defined(__DARWIN__), ... */
 	
+#if FUSE_VERSION >= 30
+		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0, 0);
+#else
 		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
+#endif
 	}
 	
 	free(filename);
@@ -1424,9 +1442,16 @@ static int ntfs_fuse_opendir(const char *path,
 
 #endif
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_readdir(const char *path, void *buf,
+		fuse_fill_dir_t filler, off_t offset __attribute__((unused)),
+		struct fuse_file_info *fi __attribute__((unused)),
+		enum fuse_readdir_flags flags __attribute__((unused)))
+#else
 static int ntfs_fuse_readdir(const char *path, void *buf,
 		fuse_fill_dir_t filler, off_t offset __attribute__((unused)),
 		struct fuse_file_info *fi __attribute__((unused)))
+#endif
 {
 	ntfs_fuse_fill_context_t fill_ctx;
 	ntfs_inode *ni;
@@ -1497,8 +1522,13 @@ static int ntfs_fuse_open(const char *org_path,
 			else
 				if (fi->flags & O_RDWR)
 					 accesstype = S_IWRITE | S_IREAD;
-				else
+				else {
 					accesstype = S_IREAD;
+					if (fi->flags & O_TRUNC) {
+						res = -EACCES;
+						goto close;
+					}
+				}
 			/*
 			 * directory must be searchable
 			 * and requested access allowed
@@ -1524,6 +1554,8 @@ static int ntfs_fuse_open(const char *org_path,
 		}
 		if ((res >= 0)
 		    && (fi->flags & (O_WRONLY | O_RDWR))) {
+		/* mark ftruncate() to be allowed, whatever the permissions */
+			fi->fh |= CLOSE_CAN_TRUNCATE;
 		/* mark a future need to compress the last chunk */
 			if (na->data_flags & ATTR_COMPRESSION_MASK)
 				fi->fh |= CLOSE_COMPRESSED;
@@ -1540,6 +1572,13 @@ static int ntfs_fuse_open(const char *org_path,
 		/* deny opening metadata files for writing */
 			if (ni->mft_no < FILE_first_user)
 				res = -EPERM;
+			if ((res >= 0) && (fi->flags & O_TRUNC)) {
+				if (ntfs_attr_truncate(na, 0))
+					res = -errno;
+				else
+					ntfs_fuse_update_times(ni,
+							NTFS_UPDATE_MCTIME);
+			}
 		}
 		ntfs_attr_close(na);
 close:
@@ -1899,6 +1938,10 @@ exit:
 	return res;
 }
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_truncate(const char *org_path, off_t size,
+			struct fuse_file_info *fi __attribute__((unused)))
+#else
 static int ntfs_fuse_truncate(const char *org_path, off_t size)
 {
 	return ntfs_fuse_trunc(org_path, size, TRUE);
@@ -1906,16 +1949,31 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 
 static int ntfs_fuse_ftruncate(const char *org_path, off_t size,
 			struct fuse_file_info *fi __attribute__((unused)))
+#endif
 {
+#if FUSE_VERSION >= 30
+	/*
+	 * Bypass the permission checks if the file
+	 * had been opened for write.
+	 */
+	return (ntfs_fuse_trunc(org_path, size,
+				!fi || !(fi->fh & CLOSE_CAN_TRUNCATE)));
+#else
 	/*
 	 * in ->ftruncate() the file handle is guaranteed
 	 * to have been opened for write.
 	 */
 	return (ntfs_fuse_trunc(org_path, size, FALSE));
+#endif
 }
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_chmod(const char *path,
+		mode_t mode, struct fuse_file_info *fi __attribute__((unused)))
+#else
 static int ntfs_fuse_chmod(const char *path,
 		mode_t mode)
+#endif
 {
 	int res = 0;
 	ntfs_inode *ni;
@@ -1960,7 +2018,12 @@ static int ntfs_fuse_chmod(const char *path,
 	return res;
 }
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid,
+		struct fuse_file_info *fi __attribute__((unused)))
+#else
 static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
+#endif
 {
 	ntfs_inode *ni;
 	int res;
@@ -2208,6 +2271,9 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 #endif
 			}
 			set_archive(ni);
+			/* ftruncate() to be allowed, whatever permissions */
+			if (fi)
+				fi->fh |= CLOSE_CAN_TRUNCATE;
 			/* mark a need to compress the end of file */
 			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
 				fi->fh |= CLOSE_COMPRESSED;
@@ -2676,9 +2742,15 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 	return 	ret;
 }
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_rename(const char *old_path, const char *new_path,
+		unsigned int flags)
+#else
 static int ntfs_fuse_rename(const char *old_path, const char *new_path)
+#endif
 {
-	int ret, stream_name_len;
+	int ret;
+	int stream_name_len = 0;
 	char *path = NULL;
 	ntfschar *stream_name;
 	ntfs_inode *ni;
@@ -2686,7 +2758,15 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 	BOOL same;
 	
 	ntfs_log_debug("rename: old: '%s'  new: '%s'\n", old_path, new_path);
-	
+
+#if FUSE_VERSION >= 30
+	if (flags && flags != RENAME_EXCHANGE && flags != RENAME_NOREPLACE) {
+		/* Unknown flag or invalid combination of flags. */
+		ret = -EINVAL;
+		goto out;
+	}
+#endif
+
 	/*
 	 *  FIXME: Rename should be atomic.
 	 */
@@ -2696,6 +2776,14 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 	
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (ni) {
+#if FUSE_VERSION >= 30
+		if (flags & RENAME_NOREPLACE) {
+			ret = -EEXIST;
+			ntfs_inode_close(ni);
+			goto out;
+		}
+#endif
+
 		ret = ntfs_check_empty_dir(ni);
 		if (ret < 0) {
 			ret = -errno;
@@ -2766,7 +2854,12 @@ static int ntfs_fuse_rmdir(const char *path)
 
 #ifdef HAVE_UTIMENSAT
 
+#if FUSE_VERSION >= 30
+static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2],
+		struct fuse_file_info *fi __attribute__((unused)))
+#else
 static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2])
+#endif
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -3951,7 +4044,9 @@ static struct fuse_operations ntfs_3g_ops = {
 	.read		= ntfs_fuse_read,
 	.write		= ntfs_fuse_write,
 	.truncate	= ntfs_fuse_truncate,
+#if FUSE_VERSION < 30
 	.ftruncate	= ntfs_fuse_ftruncate,
+#endif
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
@@ -4202,6 +4297,7 @@ static fuse_fstype load_fuse_module(void)
 
 #endif
 
+#if FUSE_VERSION < 30
 static struct fuse_chan *try_fuse_mount(char *parsed_options)
 {
 	struct fuse_chan *fc = NULL;
@@ -4221,6 +4317,7 @@ free_args:
 	return fc;
 		
 }
+#endif
 		
 static int set_fuseblk_options(char **parsed_options)
 {
@@ -4245,18 +4342,33 @@ static struct fuse *mount_fuse(char *parsed_options)
 {
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-	
+#if FUSE_VERSION >= 30
+	int mounted = 0;
+#endif
+
+#if FUSE_VERSION < 30
 	ctx->fc = try_fuse_mount(parsed_options);
 	if (!ctx->fc)
 		return NULL;
-	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+	if (fuse_opt_add_arg(&args, "-ouse_ino") == -1)
+		goto err;
+#else
+	/* The fuse_mount() options get modified, so we always rebuild it */
+	if ((fuse_opt_add_arg(&args, EXEC_NAME) == -1 ||
+	     fuse_opt_add_arg(&args, "-o") == -1 ||
+	     fuse_opt_add_arg(&args, parsed_options) == -1)) {
+		ntfs_log_error("Failed to set FUSE options.\n");
+		goto err;
+	}
+#endif
+
 	if (ctx->ro) {
 		char buf[128];
 		int len;
         
-		len = snprintf(buf, sizeof(buf), "-ouse_ino,kernel_cache"
+		len = snprintf(buf, sizeof(buf), "-okernel_cache"
 				",attr_timeout=%d,entry_timeout=%d",
 				(int)TIMEOUT_RO, (int)TIMEOUT_RO);
 		if ((len < 0)
@@ -4265,11 +4377,11 @@ static struct fuse *mount_fuse(char *parsed_options)
 			goto err;
 	} else {
 #if !CACHEING
-		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+		if (fuse_opt_add_arg(&args, "-okernel_cache"
 				",attr_timeout=0") == -1)
 			goto err;
 #else
-		if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache"
+		if (fuse_opt_add_arg(&args, "-okernel_cache"
 				",attr_timeout=1") == -1)
 			goto err;
 #endif
@@ -4277,21 +4389,47 @@ static struct fuse *mount_fuse(char *parsed_options)
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
-	
+
+#if FUSE_VERSION >= 30
+	fh = fuse_new(&args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+#else
 	fh = fuse_new(ctx->fc, &args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+#endif
 	if (!fh)
 		goto err;
-	
+
+#if FUSE_VERSION >= 30
+	if (fuse_mount(fh, opts.mnt_point)) {
+		goto err;
+	}
+
+	mounted = 1;
+#endif
+
 	if (fuse_set_signal_handlers(fuse_get_session(fh)))
-		goto err_destory;
+		goto err;
 out:
+#if FUSE_VERSION >= 30
+	ctx->fc = fuse_get_session(fh);
+#endif
+
 	fuse_opt_free_args(&args);
 	return fh;
-err_destory:
-	fuse_destroy(fh);
-	fh = NULL;
-err:	
+err:
+#if FUSE_VERSION >= 30
+	if (mounted) {
+		fuse_unmount(fh);
+	}
+#endif
+
+	if (fh) {
+		fuse_destroy(fh);
+		fh = NULL;
+	}
+
+#if FUSE_VERSION < 30
 	fuse_unmount(opts.mnt_point, ctx->fc);
+#endif
 	goto out;
 }
 
@@ -4357,7 +4495,7 @@ int main(int argc, char *argv[])
 #endif
 	if (drop_privs())
 		return NTFS_VOLUME_NO_PRIVILEGE;
-	
+
 	ntfs_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
@@ -4580,7 +4718,11 @@ int main(int argc, char *argv[])
 	
 	err = 0;
 
+#if FUSE_VERSION >= 30
+	fuse_unmount(fh);
+#else
 	fuse_unmount(opts.mnt_point, ctx->fc);
+#endif
 	fuse_destroy(fh);
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);

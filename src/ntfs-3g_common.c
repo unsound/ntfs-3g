@@ -71,7 +71,11 @@ const int nf_ns_trusted_prefix_len = sizeof(nf_ns_trusted_prefix) - 1;
 
 static const char nf_ns_alt_xattr_efsinfo[] = "user.ntfs.efsinfo";
 
+#if FUSE_VERSION >= 30
+static const char def_opts[] = "allow_other,";
+#else
 static const char def_opts[] = "allow_other,nonempty,";
+#endif
 
 	/*
 	 *	 Table of recognized options
@@ -613,12 +617,14 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			&& ntfs_strappend(&ret, "default_permissions,"))
 		goto err_exit;
 			/* The atime options exclude each other */
+#if FUSE_VERSION < 30
 	if (ctx->atime == ATIME_RELATIVE && ntfs_strappend(&ret, "relatime,"))
 		goto err_exit;
 	else if (ctx->atime == ATIME_ENABLED && ntfs_strappend(&ret, "atime,"))
 		goto err_exit;
 	else if (ctx->atime == ATIME_DISABLED && ntfs_strappend(&ret, "noatime,"))
 		goto err_exit;
+#endif
 	
 	if (ntfs_strappend(&ret, "fsname="))
 		goto err_exit;

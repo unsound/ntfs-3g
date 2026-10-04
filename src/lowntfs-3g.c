@@ -1627,8 +1627,13 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 			else
 				if (fi->flags & O_RDWR)
 					accesstype = S_IWRITE | S_IREAD;
-				else
+				else {
 					accesstype = S_IREAD;
+#if FUSE_VERSION >= 30
+					if (fi->flags & O_TRUNC)
+						res = -EACCES;
+#endif
+				}
 		     /* check whether requested access is allowed */
 			if (!ntfs_allowed_access(&security,
 					ni,accesstype))
@@ -1668,6 +1673,15 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 			/* deny opening metadata files for writing */
 			if (ino < FILE_first_user)
 				res = -EPERM;
+#if FUSE_VERSION >= 30
+			if ((res >= 0) && (fi->flags & O_TRUNC)) {
+				if (ntfs_attr_truncate(na, 0))
+					res = -errno;
+				else
+					ntfs_fuse_update_times(ni,
+							NTFS_UPDATE_MCTIME);
+			}
+#endif
 		}
 		ntfs_attr_close(na);
 close:
@@ -3005,9 +3019,15 @@ static int ntfs_fuse_rename_existing_dest(fuse_req_t req, fuse_ino_t ino,
 	return	ret;
 }
 
+#if FUSE_VERSION >= 30
+static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
+			const char *name, fuse_ino_t newparent,
+			const char *newname, unsigned int flags)
+#else
 static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
 			const char *name, fuse_ino_t newparent,
 			const char *newname)
+#endif
 {
 	int ret;
 	fuse_ino_t ino;
@@ -3015,7 +3035,15 @@ static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
 	ntfs_inode *ni;
         
 	ntfs_log_debug("rename: old: '%s'  new: '%s'\n", name, newname);
-        
+
+#if FUSE_VERSION >= 30
+	if (flags && flags != RENAME_EXCHANGE && flags != RENAME_NOREPLACE) {
+		/* Unknown flag or invalid combination of flags. */
+		ret = -EINVAL;
+		goto out;
+	}
+#endif
+
 	/*
 	 *  FIXME: Rename should be atomic.
 	 */
@@ -3037,6 +3065,14 @@ static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
 		if (!ni)
 			ret = -errno;
 		else {
+#if FUSE_VERSION >= 30
+			if (flags & RENAME_NOREPLACE) {
+				ret = -EEXIST;
+				ntfs_inode_close(ni);
+				goto out;
+			}
+#endif
+
 			ret = ntfs_check_empty_dir(ni);
 			if (ret < 0) {
 				ret = -errno;
@@ -4494,6 +4530,7 @@ static fuse_fstype load_fuse_module(void)
 
 #endif
 
+#if FUSE_VERSION < 30
 static struct fuse_chan *try_fuse_mount(char *parsed_options)
 {
 	struct fuse_chan *fc = NULL;
@@ -4513,6 +4550,7 @@ free_args:
 	return fc;
 	        
 }
+#endif
 	        
 static int set_fuseblk_options(char **parsed_options)
 {
@@ -4537,33 +4575,71 @@ static struct fuse_session *mount_fuse(char *parsed_options)
 {
 	struct fuse_session *se = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-        
+#if FUSE_VERSION >= 30
+	int mounted = 0;
+#endif
+
+#if FUSE_VERSION < 30
 	ctx->fc = try_fuse_mount(parsed_options);
 	if (!ctx->fc)
 		return NULL;
-        
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
+#else
+	/* The fuse_mount() options get modified, so we always rebuild it */
+	if ((fuse_opt_add_arg(&args, EXEC_NAME) == -1 ||
+	     fuse_opt_add_arg(&args, "-o") == -1 ||
+	     fuse_opt_add_arg(&args, parsed_options) == -1)) {
+		ntfs_log_error("Failed to set FUSE options.\n");
+		goto err;
+	}
+#endif
+
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
         
+#if FUSE_VERSION >= 30
+	se = fuse_session_new(&args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+#else
 	se = fuse_lowlevel_new(&args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+#endif
 	if (!se)
 		goto err;
-        
-        
+
+#if FUSE_VERSION >= 30
+	if (fuse_session_mount(se, opts.mnt_point)) {
+		goto err;
+	}
+
+	mounted = 1;
+#endif
+
 	if (fuse_set_signal_handlers(se))
-		goto err_destroy;
+		goto err;
+#if FUSE_VERSION >= 30
+	ctx->fc = se;
+#else
 	fuse_session_add_chan(se, ctx->fc);
+#endif
 out:
 	fuse_opt_free_args(&args);
 	return se;
-err_destroy:
-	fuse_session_destroy(se);
-	se = NULL;
-err:    
+err:
+#if FUSE_VERSION >= 30
+	if (mounted) {
+		fuse_session_unmount(se);
+	}
+#endif
+
+	if (se) {
+		fuse_session_destroy(se);
+		se = NULL;
+	}
+
+#if FUSE_VERSION < 30
 	fuse_unmount(opts.mnt_point, ctx->fc);
+#endif
 	goto out;
 }
 
@@ -4851,7 +4927,11 @@ int main(int argc, char *argv[])
         
 	err = 0;
 
+#if FUSE_VERSION >= 30
+	fuse_session_unmount(se);
+#else
 	fuse_unmount(opts.mnt_point, ctx->fc);
+#endif
 	fuse_session_destroy(se);
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);

@@ -165,7 +165,11 @@ typedef struct {
 	char *xattrmap_path;
 #endif /* XATTR_MAPPINGS */
 #endif /* HAVE_SETXATTR */
+#if FUSE_VERSION >= 30
+	struct fuse_session *fc;
+#else
 	struct fuse_chan *fc;
+#endif
 	BOOL inherit;
 	unsigned int secure_flags;
 	single_log_t errors_logged;
