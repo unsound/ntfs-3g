@@ -679,7 +679,7 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 #endif /* ENABLE_NFCONV */
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 	
-	ret = t - *outs;
+	ret = (int)(t - *outs);
 out:
 	return ret;
 fail:
