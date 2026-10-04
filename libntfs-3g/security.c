@@ -821,7 +821,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
  */
 
 static le32 setsecurityattr(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz)
+			const SECURITY_DESCRIPTOR_RELATIVE *attr, int attrsz)
 {
 	struct SDH *psdh;	/* this is an image of index (le) */
 	union {
@@ -845,7 +845,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 	le32 hash;
 	int olderrno;
 
-	hash = ntfs_security_hash(attr,attrsz);
+	hash = ntfs_security_hash(attr, attrsz);
 	oldattr = (char*)NULL;
 	securid = const_cpu_to_le32(0);
 	res = 0;
@@ -1012,7 +1012,7 @@ static int update_secur_descr(ntfs_volume *vol,
 
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
-			(s64)newattrsz);
+			newattrsz);
 		if (securid) {
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
 				AT_UNNAMED, 0);
@@ -1088,7 +1088,7 @@ static int upgrade_secur_desc(ntfs_volume *vol,
 		attrsz = ntfs_attr_size(attr);
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
-			(s64)attrsz);
+			attrsz);
 		if (securid) {
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
 				AT_UNNAMED, 0);
