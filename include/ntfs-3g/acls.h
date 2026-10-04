@@ -111,7 +111,7 @@ struct MAPLIST {
 	char maptext[LINESZ + 1];
 };
 
-typedef int (*FILEREADER)(void *fileid, char *buf, size_t size, off_t pos);
+typedef ssize_t (*FILEREADER)(void *fileid, char *buf, size_t size, off_t pos);
 
 /*
  *		Constants defined in acls.c

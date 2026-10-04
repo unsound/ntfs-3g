@@ -1776,7 +1776,7 @@ static void freeblocks(void)
  *		Basic read from a user mapping file (Win32)
  */
 
-static int basicread(void *fileid, char *buf, size_t size,
+static ssize_t basicread(void *fileid, char *buf, size_t size,
 		off_t pos __attribute__((unused)))
 {
 	return (read(*(int*)fileid, buf, size));
@@ -1788,7 +1788,7 @@ static int basicread(void *fileid, char *buf, size_t size,
  *		Read a dummy mapping file for tests
  */
 
-static int dummyread(void *fileid  __attribute__((unused)),
+static ssize_t dummyread(void *fileid  __attribute__((unused)),
 		char *buf, size_t size, off_t pos)
 {
 	size_t sz;

@@ -4309,7 +4309,8 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
  *		Basic read from a user mapping file on another volume
  */
 
-static int basicread(void *fileid, char *buf, size_t size, off_t offs __attribute__((unused)))
+static ssize_t basicread(void *fileid, char *buf, size_t size,
+		off_t offs __attribute__((unused)))
 {
 	return (read(*(int*)fileid, buf, size));
 }
@@ -4319,7 +4320,7 @@ static int basicread(void *fileid, char *buf, size_t size, off_t offs __attribut
  *		Read from a user mapping file on current NTFS partition
  */
 
-static int localread(void *fileid, char *buf, size_t size, off_t offs)
+static ssize_t localread(void *fileid, char *buf, size_t size, off_t offs)
 {
 	return (ntfs_attr_data_read((ntfs_inode*)fileid,
 			AT_UNNAMED, 0, buf, size, offs));
