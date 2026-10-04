@@ -5705,7 +5705,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	a->name_offset = cpu_to_le16(name_ofs);
 
 	/* Resize the resident part of the attribute record. */
-	if (ntfs_attr_record_resize(ctx->mrec, a, arec_size) < 0) {
+	if (ntfs_attr_record_resize(ctx->mrec, a, (u32)arec_size) < 0) {
 		/*
 		 * Bug, because ntfs_attr_record_resize should not fail (we
 		 * already checked that attribute fits MFT record).
