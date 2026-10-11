@@ -1956,7 +1956,8 @@ static int local_build_mapping(struct MAPPING *mapping[], const char *usermap_pa
 			mapping[MAPUSERS] = usermapping;
 			mapping[MAPGROUPS] = groupmapping;
 		} else
-			ntfs_log_error("There were no valid user or no valid group\n");
+			ntfs_log_error("No valid user or group mappings "
+				"found.\n");
 		/* now we can free the memory copy of input text */
 		/* and rely on internal representation */
 		while (firstitem) {
