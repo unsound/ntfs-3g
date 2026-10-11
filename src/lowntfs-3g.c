@@ -3037,7 +3037,7 @@ static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
 	ntfs_log_debug("rename: old: '%s'  new: '%s'\n", name, newname);
 
 #if FUSE_VERSION >= 30
-	if (flags && flags != RENAME_EXCHANGE && flags != RENAME_NOREPLACE) {
+	if (flags && flags != RENAME_NOREPLACE) {
 		/* Unknown flag or invalid combination of flags. */
 		ret = -EINVAL;
 		goto out;

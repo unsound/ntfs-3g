@@ -2768,7 +2768,7 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 	ntfs_log_debug("rename: old: '%s'  new: '%s'\n", old_path, new_path);
 
 #if FUSE_VERSION >= 30
-	if (flags && flags != RENAME_EXCHANGE && flags != RENAME_NOREPLACE) {
+	if (flags && flags != RENAME_NOREPLACE) {
 		/* Unknown flag or invalid combination of flags. */
 		ret = -EINVAL;
 		goto out;
