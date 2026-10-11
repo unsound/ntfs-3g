@@ -583,8 +583,9 @@ static s64 wipe_unused_fast(ntfs_volume *vol, int byte, enum action act)
 		 * ignore the block
 		 */
 		if (ntfs_pread(vol->dev, vol->cluster_size * i,
-					vol->cluster_size * blksize, big_buffer)
-				!= vol->cluster_size * blksize) {
+					vol->cluster_size * (s64)blksize,
+					big_buffer)
+				!= vol->cluster_size * (s64)blksize) {
 			ntfs_log_error("Read failed at cluster %lld\n",
 					(long long)i);
 			goto free;
@@ -622,8 +623,8 @@ static s64 wipe_unused_fast(ntfs_volume *vol, int byte, enum action act)
 
 		if ((act == act_wipe)
 			&& (ntfs_pwrite(vol->dev, vol->cluster_size * i,
-				vol->cluster_size * blksize, big_buffer)
-					!= vol->cluster_size * blksize)) {
+				vol->cluster_size * (s64)blksize, big_buffer)
+					!= vol->cluster_size * (s64)blksize)) {
 			ntfs_log_error("Write failed at cluster %lld\n",
 					(long long)i);
 			goto free;
